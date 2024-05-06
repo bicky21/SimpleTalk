@@ -101,7 +101,7 @@ int main() {
 
     return 0;
 }
-/*This program is a simple lexer for a fictional programming language called Simptalk. The lexer reads an input string containing a basic arithmetic expression and tokenizes it into individual tokens. The tokens include numbers, arithmetic operators (+, -, *, /), and parentheses. The lexer skips whitespace characters and identifies invalid characters, such as letters or special characters not supported by the language.
+/*This program is a simple lexer for a Simptalk programming language called Simptalk. The lexer reads an input string containing a basic arithmetic expression and tokenizes it into individual tokens. The tokens include numbers, arithmetic operators (+, -, *, /), and parentheses. The lexer skips whitespace characters and identifies invalid characters, such as letters or special characters not supported by the language.
 
 The program demonstrates the basic principles of lexical analysis, which is the process of converting a sequence of characters into a sequence of tokens. Lexical analysis is an essential first step in the compilation process of a programming language.
 
