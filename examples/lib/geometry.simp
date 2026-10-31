@@ -1,0 +1,10 @@
+;; A small module: everything defined here can be brought in with `use`.
+let pi 3.14159
+
+fn circle_area r
+    ret round(pi * r * r, 2)
+.
+
+fn rect_area w h
+    ret w * h
+.

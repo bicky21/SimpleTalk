@@ -8,6 +8,7 @@
 """
 
 import argparse
+import os
 import sys
 
 from . import __version__
@@ -70,7 +71,8 @@ def run_file(path, mode="run"):
             def trace(line):
                 code = lines[line - 1].strip() if 1 <= line <= len(lines) else ""
                 print(f"  > line {line:<3} | {code}", flush=True)
-        interp = Interpreter(trace=trace)
+        interp = Interpreter(trace=trace, program_path=path)
+        interp.source, interp.filename = source, path
         interp.run(program)
     except SimpleTalkError as err:
         report_tests(interp)
@@ -148,6 +150,20 @@ def repl():
 
 
 def main(argv=None):
+    try:
+        return _main(argv)
+    except BrokenPipeError:
+        # The output went to a command that stopped reading (like `| head`).
+        # That's not a problem with the program, so finish quietly.
+        try:
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(devnull, sys.stdout.fileno())
+        except (OSError, ValueError):
+            pass
+        return 0
+
+
+def _main(argv=None):
     ap = argparse.ArgumentParser(prog="simpletalk",
                                  description="Run SimpleTalk programs (.simp files).")
     ap.add_argument("file", nargs="?", help="the .simp program to run")

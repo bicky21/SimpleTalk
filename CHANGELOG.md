@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.2.0 – 2026-10-31
+
+Advanced features, still pure Python with no dependencies.
+
+### Added
+- Maps: `{name: "Bicky", age: 20}`, `me.name`, `me["key"]`, `let me.age 21`, `del me "age"`, `has`, `keys()`, `values()`.
+- Pipelines: `list | only it > 1 | each it * 2 | sort`, with any function as a step.
+- Quick functions: `fn n -> n * 2`, which can be stored and passed to other functions.
+- Pattern matching: `pick value` / `is a, b` / `is 1..5` / `else`.
+- Error handling: `try` ... `fail why` ... `.`, and `oops "message"` to raise your own problem.
+- Modules: `use "lib/file"`, relative to the program, with errors reported in the right file.
+- Files and JSON: `read`, `write`, `load`, `save`, `exists`.
+- Remembered values: `keep name default` saves to `<program>.memory.json` between runs.
+- Tasks: `task name` ... `.` runs alongside the program; `await name` waits and returns its result.
+- Examples 10–15.
+
+### Fixed
+- Windows + Python 3.10 crashed on deep recursion (the failing CI badge). Programs now run on a
+  large-stack worker thread, and Ctrl+C stops cleanly, even while waiting for input.
+- `wait()` can now be interrupted with Ctrl+C.
+
+### Changed
+- New keywords (so they can't be variable names): `try`, `fail`, `oops`, `pick`, `is`, `use`, `keep`, `task`, `await`.
+- `len()` also counts the entries of a map.
+
 ## 2.1.0 – 2026-10-31
 
 Learning tools built into the language.

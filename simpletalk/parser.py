@@ -11,6 +11,11 @@ SimpleTalk 2.0 grammar, in one screen:
     fn NAME PARAM PARAM ... .                       ret [VALUE]
     stop                      skip                  NAME(ARGS)
     watch NAME NAME ...       test CHECK
+    try ... fail [NAME] ... .                       oops MESSAGE
+    pick VALUE  is PATTERN, ... ...  else ... .     use "file"
+    keep NAME DEFAULT         task NAME ... .       await NAME
+
+Values: {name: "Bicky"}  me.name  fn a b -> a + b  list | only it > 1 | each it * 2
 
 A block is closed by a line holding just a dot.
 Rule for calls and positions: no space before ( or [  ->  area(3, 4)  list[1]
@@ -34,6 +39,10 @@ OLD_WORDS = {
     "return": "ret", "break": "stop", "continue": "skip",
     "remove": "del", "append": "add", "push": "add",
     "end": ".", "endif": ".", "done": ".",
+    "import": "use", "include": "use", "require": "use",
+    "match": "pick", "switch": "pick", "case": "is",
+    "raise": "oops", "throw": "oops", "catch": "fail", "except": "fail",
+    "async": "task", "lambda": "fn",
 }
 
 
@@ -104,6 +113,9 @@ class Parser:
             return
         hint = "Each instruction goes on its own line."
         prev = self.tokens[self.i - 1] if self.i else None
+        if self.at("SYMBOL", ":") and self.peek().kind in ("NEWLINE", "EOF"):
+            self.fail("SimpleTalk doesn't put ':' at the end of a line.",
+                      hint="Just remove it. The block ends with a line holding a dot ( . )")
         if self.at("SYMBOL") and self.tok.value in "([" and self.tok.spaced and prev is not None \
                 and prev.kind in ("NAME", "SYMBOL", "TEXT") and prev.value not in ("(", "[", ","):
             hint = f"Remove the space before '{self.tok.value}', like: name{self.tok.value}...{')' if self.tok.value == '(' else ']'}"
@@ -113,13 +125,19 @@ class Parser:
         while self.at("NEWLINE"):
             self.next()
 
+    def at_field(self):
+        """`me.name`: a dot touching a name on both sides (a lone '.' closes a block)."""
+        nxt = self.peek()
+        return (self.at("SYMBOL", ".") and not self.tok.spaced
+                and nxt.kind in ("NAME", "KEYWORD") and not nxt.spaced)
+
     def starts_value(self, tok, after):
         """Can `tok` begin a new value? Used to tell `loop i 1..5` from `loop n`."""
         if tok.kind in ("NUMBER", "TEXT", "NAME"):
             return True
-        if tok.kind == "KEYWORD" and tok.value in ("true", "false", "none", "not"):
+        if tok.kind == "KEYWORD" and tok.value in ("true", "false", "none", "not", "fn", "await"):
             return True
-        if tok.kind == "SYMBOL" and tok.value in ("(", "["):
+        if tok.kind == "SYMBOL" and tok.value in ("(", "[", "{"):
             return tok.spaced
         if tok.kind == "SYMBOL" and tok.value == "-":
             return tok.spaced and not after.spaced      # `-3` yes, `- 3` no
@@ -149,11 +167,13 @@ class Parser:
     def at_block_end(self):
         return self.at("SYMBOL", ".")
 
-    def block(self, opener, open_tok, stop_at_else=False):
-        """Read statements until the closing '.' (and 'else' inside a when)."""
+    def block(self, opener, open_tok, stop_at_else=False, stop_words=()):
+        """Read statements until the closing '.' (and 'else' / other stop words)."""
         body = []
         self.skip_newlines()
         while True:
+            if stop_words and self.at_kw(*stop_words):
+                return body
             if self.at("EOF"):
                 raise SyntaxProblem(
                     f"The '{opener}' that starts on line {open_tok.line} was never closed.",
@@ -212,12 +232,17 @@ class Parser:
         tok = self.tok
         name = self.expect_name(what)
         node = N.Name(name.value, line=name.line, column=name.column)
-        while self.at("SYMBOL", "[") and not self.tok.spaced:
-            br = self.next()
-            index = self.expression()
-            self.expect_sym("]")
-            node = N.Index(node, index, line=br.line, column=br.column)
-        return node
+        while True:
+            if self.at("SYMBOL", "[") and not self.tok.spaced:
+                br = self.next()
+                index = self.expression()
+                self.expect_sym("]")
+                node = N.Index(node, index, line=br.line, column=br.column)
+            elif self.at_field():
+                dot = self.next()
+                node = N.Field(node, self.next().value, line=dot.line, column=dot.column)
+            else:
+                return node
 
     def stmt_let(self):
         tok = self.next()
@@ -313,6 +338,8 @@ class Parser:
         if self.at_line_end():
             self.fail("'when' needs something to check.", hint="Write it like: when age > 18")
         cond = self.expression()
+        if self.at("SYMBOL", ":"):
+            self.end_of_line()                 # gives the "no ':' needed" hint
         if not self.at_line_end():
             self.fail(f"I didn't expect {self.describe(self.tok)} here.",
                       hint="Put the code that should run on the next line, and end the block with a '.' line.")
@@ -380,6 +407,8 @@ class Parser:
             self.fail("Write the inputs without brackets, separated by spaces.",
                       hint=f"Like: fn {name} a b")
         while not self.at_line_end():
+            if self.at("SYMBOL", ":"):
+                self.end_of_line()             # gives the "no ':' needed" hint
             if self.at("SYMBOL", ","):
                 self.fail("Separate the inputs with spaces, not commas.", hint=f"Like: fn {name} a b")
             p = self.expect_name("an input name").value
@@ -421,12 +450,113 @@ class Parser:
         return N.Skip(line=tok.line, column=tok.column)
 
     def stmt_else(self):
-        self.fail("This 'else' is not inside a 'when'.")
+        self.fail("This 'else' is not inside a 'when' or 'pick'.")
+
+    # -- error handling ----------------------------------------------------
+    def stmt_try(self):
+        tok = self.next()
+        self.end_of_line()
+        body = self.block("try", tok, stop_words=("fail",))
+        if not self.at_kw("fail"):
+            self.fail("A 'try' block needs a 'fail' part that says what to do when something goes wrong.",
+                      hint="Write it like:  try ... fail why ... .")
+        self.next()
+        err_name = None
+        if not self.at_line_end():
+            err_name = self.expect_name("a name for the problem message").value
+        self.end_of_line()
+        handler = self.block("try", tok)
+        self.close_block()
+        return N.Try(body, err_name, handler, line=tok.line, column=tok.column)
+
+    def stmt_fail(self):
+        self.fail("'fail' belongs inside a 'try' block.",
+                  hint="To stop with your own message, write: oops \"message\"")
+
+    def stmt_oops(self):
+        tok = self.next()
+        if self.at_line_end():
+            self.fail("'oops' needs a message.", hint='Write it like: oops "Not enough money"')
+        message = self.expression()
+        self.end_of_line()
+        return N.Oops(message, line=tok.line, column=tok.column)
+
+    # -- pattern matching ----------------------------------------------------
+    def stmt_pick(self):
+        tok = self.next()
+        if self.at_line_end():
+            self.fail("'pick' needs a value to look at.", hint="Write it like: pick day")
+        value = self.expression()
+        self.end_of_line()
+        self.skip_newlines()
+        cases, else_body = [], None
+        if not self.at_kw("is"):
+            self.fail("After 'pick', each choice starts with 'is'.", hint='Like:  is "sat", "sun"')
+        while self.at_kw("is"):
+            self.next()
+            patterns = [self.expression()]
+            while self.at("SYMBOL", ","):
+                self.next()
+                patterns.append(self.expression())
+            self.end_of_line()
+            body = self.block("pick", tok, stop_at_else=True, stop_words=("is",))
+            cases.append((patterns, body))
+        if self.at_kw("else"):
+            self.next()
+            self.end_of_line()
+            else_body = self.block("pick", tok, stop_words=("is",))
+            if self.at_kw("is"):
+                self.fail("'else' must be the last choice in a 'pick'.")
+        self.close_block()
+        return N.Pick(value, cases, else_body, line=tok.line, column=tok.column)
+
+    def stmt_is(self):
+        self.fail("'is' is used inside a 'pick' block.",
+                  hint="To compare two values, use = (for example: when x = 5)")
+
+    # -- files, memory, tasks ------------------------------------------------
+    def stmt_use(self):
+        tok = self.next()
+        if not self.at("TEXT"):
+            self.fail("'use' needs the file name in quotes.", hint='Write it like: use "shapes.simp"')
+        path = self.expression()
+        self.end_of_line()
+        return N.Use(path, line=tok.line, column=tok.column)
+
+    def stmt_keep(self):
+        tok = self.next()
+        name = self.expect_name("a variable name").value
+        if self.at_line_end():
+            self.fail("'keep' needs a starting value for the first run.", hint=f"Write it like: keep {name} 0")
+        default = self.expression()
+        self.end_of_line()
+        return N.Keep(name, default, line=tok.line, column=tok.column)
+
+    def stmt_task(self):
+        tok = self.next()
+        name = self.expect_name("a name for the task").value
+        self.end_of_line()
+        saved_loop = self.loop_depth
+        self.loop_depth = 0
+        self.func_depth += 1
+        try:
+            body = self.block("task", tok)
+        finally:
+            self.func_depth -= 1
+            self.loop_depth = saved_loop
+        self.close_block()
+        return N.Task(name, body, line=tok.line, column=tok.column)
+
+    def stmt_await(self):
+        tok = self.tok
+        expr = self.primary()
+        self.end_of_line()
+        return N.ExprStatement(expr, line=tok.line, column=tok.column)
 
     def expression_statement(self):
         tok = self.tok
         expr = self.expression()
-        if not isinstance(expr, N.Call):
+        if not isinstance(expr, (N.Call, N.Await, N.Pipe)):
             hint = "To show a value write: out ...   To store one: let name value"
             raise SyntaxProblem("This line doesn't tell me to do anything.",
                                 tok.line, tok.column, hint)
@@ -435,7 +565,36 @@ class Parser:
 
     # -- expressions (lowest to highest priority) -------------------------
     def expression(self):
-        return self.or_expr()
+        value = self.or_expr()
+        if not self.at("SYMBOL", "|"):
+            return value
+        tok = self.tok
+        stages = []
+        while self.at("SYMBOL", "|"):
+            self.next()
+            if self.at("NAME", "only") or self.at("NAME", "each"):
+                word = self.next().value
+                if self.at_line_end() or self.at("SYMBOL", "|"):
+                    self.fail(f"'{word}' needs something to work out for every item.",
+                              hint="Use 'it' for the item, like: | only it > 3   or   | each it * 2")
+                stages.append((word, self.or_expr()))
+                continue
+            if not self.at("NAME"):
+                self.fail("After '|' write 'only', 'each', or a function name.",
+                          hint="Like: scores | only it > 50 | each it * 2 | sort")
+            name = self.next()
+            callee = N.Name(name.value, line=name.line, column=name.column)
+            args = []
+            if self.at("SYMBOL", "(") and not self.tok.spaced:
+                self.next()
+                while not self.at("SYMBOL", ")"):
+                    args.append(self.or_expr())
+                    if not self.at("SYMBOL", ","):
+                        break
+                    self.next()
+                self.expect_sym(")")
+            stages.append(("call", callee, args))
+        return N.Pipe(value, stages, line=tok.line, column=tok.column)
 
     def or_expr(self):
         left = self.and_expr()
@@ -464,6 +623,9 @@ class Parser:
         if self.at_kw("has"):
             self.next()
             return "has"
+        if self.at_kw("is"):
+            self.fail("To compare two values, use = instead of 'is'.",
+                      hint="Like: when x = 5   ('is' is only used inside a 'pick' block)")
         return None
 
     def comparison(self):
@@ -512,7 +674,13 @@ class Parser:
 
     def postfix(self):
         expr = self.primary()
-        while self.at("SYMBOL") and self.tok.value in ("(", "[") and not self.tok.spaced:
+        while True:
+            if self.at_field():
+                dot = self.next()
+                expr = N.Field(expr, self.next().value, line=dot.line, column=dot.column)
+                continue
+            if not (self.at("SYMBOL") and self.tok.value in ("(", "[") and not self.tok.spaced):
+                return expr
             tok = self.next()
             if tok.value == "(":
                 args = []
@@ -527,7 +695,6 @@ class Parser:
                 index = self.expression()
                 self.expect_sym("]")
                 expr = N.Index(expr, index, line=tok.line, column=tok.column)
-        return expr
 
     def primary(self):
         tok = self.tok
@@ -549,6 +716,20 @@ class Parser:
             expr = self.expression()
             self.expect_sym(")")
             return expr
+        if self.at("SYMBOL", "{"):
+            return self.map_literal()
+        if tok.kind == "KEYWORD" and tok.value == "fn":
+            self.next()
+            params = []
+            while self.at("NAME"):
+                params.append(self.next().value)
+            self.expect_sym("->", hint="A quick function looks like: fn n -> n * 2")
+            body = self.expression()
+            return N.Lambda(params, body, line=tok.line, column=tok.column)
+        if tok.kind == "KEYWORD" and tok.value == "await":
+            self.next()
+            name = self.expect_name("the name of a task")
+            return N.Await(name.value, line=tok.line, column=tok.column)
         if self.at("SYMBOL", "["):
             self.next()
             items = []
@@ -565,6 +746,29 @@ class Parser:
         if self.at_line_end():
             self.fail("I expected a value here, but the line ended.")
         self.fail(f"I expected a value here, but found {self.describe(tok)}.")
+
+    def map_literal(self):
+        tok = self.next()
+        items, seen = [], set()
+        while not self.at("SYMBOL", "}"):
+            key_tok = self.tok
+            if key_tok.kind in ("NAME", "KEYWORD"):
+                key = self.next().value
+            elif key_tok.kind == "TEXT" and all(isinstance(p, str) for p in key_tok.value.parts):
+                key = "".join(key_tok.value.parts)
+                self.next()
+            else:
+                self.fail("A map key must be a name or plain text, like {name: \"Bicky\"}.")
+            if key in seen:
+                self.fail(f"The key '{key}' appears twice in this map.", key_tok)
+            seen.add(key)
+            self.expect_sym(":", hint="Write each entry as  key: value")
+            items.append((key, self.expression()))
+            if not self.at("SYMBOL", ","):
+                break
+            self.next()
+        self.expect_sym("}", hint="Separate entries with commas, like: {name: \"Bicky\", age: 20}")
+        return N.MapLiteral(items, line=tok.line, column=tok.column)
 
     def text_node(self, tok):
         value: TextValue = tok.value

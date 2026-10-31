@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 
 from .errors import SyntaxProblem
 
-# Every reserved word in SimpleTalk. All are 2-4 letters long.
+# Every reserved word in SimpleTalk. All are 2-5 letters long.
 # Changing this list is a breaking change.
 KEYWORDS = {
     "let", "up", "out", "in",            # store, add to a number, print, input
@@ -20,13 +20,17 @@ KEYWORDS = {
     "loop", "while", "stop", "skip",     # loops
     "fn", "ret",                         # functions
     "watch", "test",                     # see changes, check your code
+    "try", "fail", "oops",               # handle problems
+    "pick", "is",                        # pattern matching
+    "use", "keep",                       # other files, remembered values
+    "task", "await",                     # run things side by side
     "and", "or", "not", "has", "mod",    # operators
     "true", "false", "none",             # values
 }
 
 # Longer symbols must be listed before shorter ones.
-SYMBOLS = ["..", "!=", "<=", ">=", "+", "-", "*", "/", "=", "<", ">",
-           "(", ")", "[", "]", ",", "."]
+SYMBOLS = ["..", "->", "!=", "<=", ">=", "+", "-", "*", "/", "=", "<", ">",
+           "(", ")", "[", "]", "{", "}", ",", ".", ":", "|"]
 
 
 @dataclass
@@ -152,24 +156,20 @@ class Lexer:
             if self.src.startswith(sym, self.pos):
                 for _ in sym:
                     self.advance()
-                if sym in "([":
+                if sym in "([{":
                     self.depth += 1
-                elif sym in ")]":
+                elif sym in ")]}":
                     self.depth = max(0, self.depth - 1)
                 self.add("SYMBOL", sym, line, col)
                 return
         ch = self.peek()
         hint = None
-        if ch in "{}":
-            hint = "Curly braces { } are only used inside text, like \"Hi {name}\"."
-        elif ch == "%":
+        if ch == "%":
             hint = "Use the word 'mod' for remainders, like: 10 mod 3"
         elif ch == "#":
             hint = "Comments start with ;;  like this:  ;; my note"
         elif ch == ";":
             hint = "Comments start with two semicolons: ;;"
-        elif ch == ":":
-            hint = "SimpleTalk doesn't use ':'. A block ends with a line holding just a dot: ."
         elif ch in "“”‘’":
             hint = "That looks like a 'smart quote'. Use plain \" quotes instead."
         raise SyntaxProblem(f"I don't know what the symbol '{ch}' means.", line, col, hint)

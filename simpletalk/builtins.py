@@ -46,9 +46,9 @@ def need_list(fn, v):
 
 # ------------------------------------------------------------------ the functions
 def b_length(x):
-    if isinstance(x, (str, list)):
+    if isinstance(x, (str, list, dict)):
         return len(x)
-    raise problem(f"len() works on text or lists, not on {type_name(x)}.")
+    raise problem(f"len() works on text, lists or maps, not on {type_name(x)}.")
 
 
 def b_number(x):
@@ -203,6 +203,18 @@ def b_copy(items):
     return list(items)
 
 
+def b_keys(m):
+    if not isinstance(m, dict):
+        raise problem(f"keys() needs a map, but got {type_name(m)}.")
+    return list(m.keys())
+
+
+def b_values(m):
+    if not isinstance(m, dict):
+        raise problem(f"values() needs a map, but got {type_name(m)}.")
+    return list(m.values())
+
+
 def b_type(x):
     return type_name(x)
 
@@ -245,3 +257,5 @@ _register("sort", b_sort, 1, 1, "sort([3, 1, 2]) -> [1, 2, 3]")
 _register("rev", b_reverse, 1, 1, "rev([1, 2, 3]) -> [3, 2, 1]")
 _register("copy", b_copy, 1, 1, "copy(my_list) -> a separate copy")
 _register("wait", b_wait, 1, 1, "wait(0.5) -> pause for half a second")
+_register("keys", b_keys, 1, 1, 'keys({a: 1, b: 2}) -> ["a", "b"]')
+_register("values", b_values, 1, 1, "values({a: 1, b: 2}) -> [1, 2]")

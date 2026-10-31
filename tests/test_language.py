@@ -261,7 +261,7 @@ def test_syntax_errors_are_friendly(source, words):
     ("let l [1]\ndel l 9", "not in the list"),
     ("fn f a\n ret a\n.\nout f(1, 2)", "needs 1 value"),
     ("fn f\n ret f()\n.\nout f()", "calling itself"),
-    ("out len(5)", "text or lists"),
+    ("out len(5)", "text, lists or maps"),
     ('out 1 < "a"', "can't compare"),
     ("up y", "doesn't exist yet"),
     ("loop [1, 2]\n.", "loop item my_list"),
@@ -275,11 +275,11 @@ def test_runtime_errors_are_friendly(source, words):
 
 
 def test_error_points_at_the_right_line():
-    src = 'out "ok"\n\nout oops'
+    src = 'out "ok"\n\nout whoops'
     err = problem(src, RuntimeProblem)
     assert err.line == 3
     text = err.pretty(src)
-    assert "3 | out oops" in text and "^" in text
+    assert "3 | out whoops" in text and "^" in text
 
 
 def test_windows_line_endings():
@@ -287,9 +287,13 @@ def test_windows_line_endings():
 
 
 # ---------------------------------------------------------------- examples and CLI
-@pytest.mark.parametrize("path", sorted(p for p in EXAMPLES.glob("*.simp") if "guess" not in p.name and "superpowers" not in p.name))
-def test_examples_run(path, capsys):
-    assert main([str(path)]) == 0
+@pytest.mark.parametrize("name", sorted(p.name for p in EXAMPLES.glob("*.simp")
+                                         if "guess" not in p.name and "superpowers" not in p.name))
+def test_examples_run(name, tmp_path, capsys):
+    import shutil
+    work = tmp_path / "examples"
+    shutil.copytree(EXAMPLES, work)        # examples may write files; keep the repo clean
+    assert main([str(work / name)]) == 0
     assert "Oops" not in capsys.readouterr().err
 
 
@@ -418,3 +422,237 @@ def test_deep_recursion_is_friendly_even_on_a_small_stack():
     t.join()
     assert "more than 1000 deep" in result["message"]
     assert result["fact"] == ["2270"]
+
+
+
+# ---------------------------------------------------------------- 2.2: maps
+def test_maps():
+    src = """
+let me {name: "Bicky", age: 20, "fav food": "momo"}
+out me.name, me["fav food"], len(me), me has "age", me has "zip"
+let me.age 21
+let me["city"] "Kolkata"
+del me "fav food"
+out me
+loop k me
+    out k
+.
+out keys({a: 1, b: 2}), values({a: 1, b: 2}), {} = {}, {a: [1]} = {a: [1]}
+"""
+    assert out(src) == ['Bicky momo 3 true false', '{name: "Bicky", age: 21, city: "Kolkata"}',
+                        "name", "age", "city", '["a", "b"] [1, 2] true true']
+
+
+def test_nested_maps_and_lists():
+    assert out('let s {tags: ["a"], inner: {x: 1}}\nadd s.tags "b"\nlet s.inner.x 2\nout s') == \
+        ['{tags: ["a", "b"], inner: {x: 2}}']
+
+
+def test_dot_still_closes_blocks():
+    assert out('let m {a: 1}\nwhen m.a = 1\n out "yes"\n.') == ["yes"]
+
+
+@pytest.mark.parametrize("source, words", [
+    ('let me {name: "A"}\nout me.nmae', "Did you mean 'name'"),
+    ("let l [1]\nout l.name", "Lists use positions"),
+    ("let m {a: 1}\nout m[1]", "Map keys are text"),
+    ('let m {a: 1}\nadd m 2', "give the key a value"),
+    ('let m {a: 1}\ndel m "b"', "no key 'b'"),
+])
+def test_map_errors(source, words):
+    err = problem(source, RuntimeProblem)
+    assert words in str(err) or words in (err.hint or "")
+
+
+def test_map_syntax_errors():
+    assert "twice" in str(problem("let m {a: 1, a: 2}"))
+    assert "name or plain text" in str(problem("let m {1: 2}"))
+
+
+# ---------------------------------------------------------------- 2.2: try / fail / oops
+def test_try_fail_catches_problems():
+    src = """
+try
+    out num("abc")
+fail why
+    out "caught:", why
+.
+try
+    out "fine"
+fail
+    out "not run"
+.
+"""
+    assert out(src) == ['caught: "abc" doesn\'t look like a number.', "fine"]
+
+
+def test_oops_raises_and_can_be_caught():
+    src = 'fn check n\n when n < 0\n  oops "negative: {n}"\n .\n ret n\n.\n'
+    assert out(src + "try\n out check(-5)\nfail why\n out why\n.") == ["negative: -5"]
+    err = problem(src + "out check(-1)", RuntimeProblem)
+    assert err.message == "negative: -1" and "The program stopped" in str(err)
+
+
+def test_try_does_not_swallow_stop_or_syntax():
+    assert out("loop i 1..5\n try\n  when i = 3\n   stop\n  .\n fail\n .\n out i\n.") == ["1", "2"]
+    assert "needs a 'fail' part" in str(problem("try\n out 1\n."))
+    assert "inside a 'try'" in str(problem("fail x"))
+
+
+# ---------------------------------------------------------------- 2.2: pick
+def test_pick():
+    src = """
+loop v ["sat", 3, 9, -2]
+    pick v
+    is "sat", "sun"
+        out "weekend"
+    is 1..5
+        out "small"
+    is -1..-10
+        out "negative-ish"
+    else
+        out "other"
+    .
+.
+"""
+    assert out(src) == ["weekend", "small", "other", "negative-ish"]
+    assert out("pick 7\nis 1\n out 1\n.") == []          # no match, no else: nothing
+
+
+def test_pick_errors():
+    assert "starts with 'is'" in str(problem("pick 3\nout 1\n."))
+    assert "use = instead of 'is'" in str(problem("when 1 is 1\n."))
+    assert "inside a 'pick'" in str(problem("is 3"))
+
+
+# ---------------------------------------------------------------- 2.2: pipelines and lambdas
+def test_pipelines():
+    assert out("out [70, 95, 40, 82] | only it > 50 | each it * 2 | sort") == ["[140, 164, 190]"]
+    assert out('out "a,b" | split(",") | join("-")') == ["a-b"]
+    assert out("out [3, 1] | sort | rev, [1, 2] | sum") == ["[3, 1] 3"]
+    assert out('out "hi" | each upper(it)') == ['["H", "I"]']
+
+
+def test_lambdas():
+    assert out("let double fn n -> n * 2\nout double(21)") == ["42"]
+    assert out("let plus fn a b -> a + b\nout plus(2, 3)") == ["5"]
+    assert out("let k 10\nlet addk fn n -> n + k\nout [1, 2] | each addk(it)") == ["[11, 12]"]
+    assert out("fn apply f x\n ret f(x)\n.\nout apply(fn n -> n * n, 7)") == ["49"]
+
+
+def test_pipeline_errors():
+    assert "works on lists" in str(problem("out 5 | each it", RuntimeProblem))
+    assert "true or false" in str(problem("out [1] | only it", RuntimeProblem))
+    assert "'only', 'each', or a function" in str(problem("out [1] | 5"))
+
+
+# ---------------------------------------------------------------- 2.2: modules
+def test_use_brings_in_names(tmp_path, capsys):
+    (tmp_path / "lib").mkdir()
+    (tmp_path / "lib" / "shapes.simp").write_text("let unit \"cm\"\nfn area w h\n ret w * h\n.\n")
+    (tmp_path / "main.simp").write_text('use "lib/shapes"\nuse "lib/shapes.simp"\nout area(3, 4), unit\n')
+    assert main([str(tmp_path / "main.simp")]) == 0
+    assert capsys.readouterr().out == "12 cm\n"
+
+
+def test_use_errors_point_at_the_right_file(tmp_path, capsys):
+    (tmp_path / "bad.simp").write_text("fn f\n    ret 1 / 0\n.\n")
+    (tmp_path / "main.simp").write_text('use "bad"\nout f()\n')
+    assert main([str(tmp_path / "main.simp")]) == 1
+    err = capsys.readouterr().err
+    assert "line 2 of bad.simp" in err and "ret 1 / 0" in err
+
+
+def test_use_missing_and_circular(tmp_path, capsys):
+    (tmp_path / "a.simp").write_text('use "b"\n')
+    (tmp_path / "b.simp").write_text('use "a"\n')
+    (tmp_path / "m.simp").write_text('use "nope"\n')
+    assert main([str(tmp_path / "a.simp")]) == 1
+    assert "uses itself" in capsys.readouterr().err
+    assert main([str(tmp_path / "m.simp")]) == 1
+    assert "can't find the file 'nope'" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------- 2.2: files and JSON
+def test_files_and_json(tmp_path, capsys):
+    prog = tmp_path / "f.simp"
+    prog.write_text('write("a.txt", "hello")\nout read("a.txt"), exists("a.txt"), exists("zz")\n'
+                    'save("d.json", {n: [1, 2.5, true, none], s: "x"})\nlet d load("d.json")\nout d\n')
+    assert main([str(prog)]) == 0
+    assert capsys.readouterr().out == 'hello true false\n{n: [1, 2.5, true, none], s: "x"}\n'
+    assert (tmp_path / "a.txt").read_text() == "hello"
+
+
+def test_file_errors():
+    assert "can't find the file" in str(problem('out read("no/such/file.txt")', RuntimeProblem))
+    assert "can't store a fn" in str(problem('save("x.json", fn n -> n)', RuntimeProblem))
+
+
+# ---------------------------------------------------------------- 2.2: keep
+def test_keep_remembers_between_runs(tmp_path, capsys):
+    prog = tmp_path / "counter.simp"
+    prog.write_text("keep visits 0\nup visits\nout visits\nkeep seen []\nadd seen visits\nout seen\n")
+    for _ in range(3):
+        assert main([str(prog)]) == 0
+    assert capsys.readouterr().out.split("\n")[-3:-1] == ["3", "[1, 2, 3]"]
+    assert (tmp_path / "counter.memory.json").exists()
+
+
+def test_keep_without_a_file_just_works():
+    assert out("keep x 5\nup x\nout x") == ["6"]
+
+
+# ---------------------------------------------------------------- 2.2: tasks
+def test_tasks_run_side_by_side_and_await():
+    src = """
+task slow
+    wait(0.15)
+    out "slow"
+    ret 42
+.
+out "first"
+out await slow
+"""
+    assert out(src) == ["first", "slow", "42"]
+
+
+def test_tasks_finish_before_program_ends():
+    assert out('task t\n wait(0.05)\n out "late"\n.\nout "end"') == ["end", "late"]
+
+
+def test_task_errors():
+    err = problem('task t\n oops "broke"\n.\nout "main"', RuntimeProblem)
+    assert err.message == "broke"
+    assert "not a task" in str(problem("let t 5\nawait t", RuntimeProblem))
+    src = 'task t\n oops "broke"\n.\ntry\n await t\nfail why\n out "caught", why\n.'
+    assert out(src) == ["caught broke"]
+
+
+# ---------------------------------------------------------------- 2.2: explain covers everything
+def test_explain_new_features():
+    from simpletalk import parse
+    from simpletalk.explain import explain
+    text = explain(parse(
+        'let m {a: 1}\nout m.a\ntry\n oops "x"\nfail why\n out why\n.\npick 3\nis 1..5\n out 1\n.\n'
+        'out [1] | only it > 0\nlet f fn n -> n\nkeep k 0\ntask t\n wait(0)\n.\nawait t\nuse "lib"'))
+    for phrase in ["a map with a = 1", "the a of m", "Try this:", "Stop with the problem message",
+                   "between 1 and 5", "keeping only the items", "a quick function",
+                   "Remember k between runs", "Start a task called t", "Wait for task t",
+                   "Bring in everything from the file"]:
+        assert phrase in text, phrase
+
+
+
+def test_piping_output_into_a_closed_reader_is_quiet(tmp_path):
+    import subprocess
+    import sys
+    prog = tmp_path / "many.simp"
+    prog.write_text("loop i 1..100000\n    out i\n.\n")
+    p = subprocess.Popen([sys.executable, "-m", "simpletalk", str(prog)],
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                         cwd=str(pathlib.Path(__file__).parent.parent))
+    p.stdout.readline()
+    p.stdout.close()                 # like `| head -1`
+    err = p.stderr.read().decode()
+    p.wait(timeout=10)
+    assert "Traceback" not in err and "BrokenPipe" not in err

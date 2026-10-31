@@ -5,19 +5,25 @@ SimpleTalk has six kinds of value:
     text     "hello"
     bool     true, false
     list     [1, 2, 3]
+    map      {name: "Bicky", age: 20}
     none     none
     fn       something made with `fn`, or a built-in like len()
+    task     something started with `task`
 """
 
 import math
+import re
+import threading
 
 
 class Function:
-    def __init__(self, name, params, body, closure):
+    def __init__(self, name, params, body, closure, source=None, filename=None):
         self.name = name
         self.params = params
         self.body = body
         self.closure = closure
+        self.source = source        # the file it was written in, so errors
+        self.filename = filename    # inside it point at the right file
 
     def __repr__(self):
         return f"<fn {self.name}>"
@@ -33,6 +39,23 @@ class Builtin:
 
     def __repr__(self):
         return f"<built-in fn {self.name}>"
+
+
+class TaskValue:
+    """A `task` running side by side with the rest of the program."""
+
+    def __init__(self, name):
+        self.name = name
+        self.done = threading.Event()
+        self.result = None
+        self.error = None
+        self.awaited = False
+
+    def __repr__(self):
+        return f"<task {self.name} {'done' if self.done.is_set() else 'running'}>"
+
+
+SIMPLE_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def is_number(v):
@@ -57,8 +80,12 @@ def type_name(v):
         return "text"
     if isinstance(v, list):
         return "list"
+    if isinstance(v, dict):
+        return "map"
     if isinstance(v, (Function, Builtin)):
         return "fn"
+    if isinstance(v, TaskValue):
+        return "task"
     return "unknown"
 
 
@@ -85,7 +112,11 @@ def show(v, nested=False):
         return '"' + v + '"' if nested else v
     if isinstance(v, list):
         return "[" + ", ".join(show(x, nested=True) for x in v) + "]"
-    if isinstance(v, (Function, Builtin)):
+    if isinstance(v, dict):
+        return "{" + ", ".join(
+            f"{k if SIMPLE_KEY.match(k) else chr(34) + k + chr(34)}: {show(x, nested=True)}"
+            for k, x in v.items()) + "}"
+    if isinstance(v, (Function, Builtin, TaskValue)):
         return repr(v)
     return str(v)
 
@@ -98,6 +129,8 @@ def equal(a, b):
         return a is b
     if isinstance(a, list) and isinstance(b, list):
         return len(a) == len(b) and all(equal(x, y) for x, y in zip(a, b))
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(equal(a[k], b[k]) for k in a)
     if type_name(a) != type_name(b):
         return False
     return a == b

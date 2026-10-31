@@ -95,17 +95,21 @@ def run_protected(interp, task):
         return result
 
 
-def _start(target):
+_limit_lock = threading.Lock()
+_active = 0
+_saved_limit = None
+
+
+def start_thread(target, name="simpletalk"):
+    """Start `target` on a daemon thread with a big stack. Returns the thread or None."""
     old_size = threading.stack_size()
-    old_limit = sys.getrecursionlimit()
     try:
         for size, limit in _STACKS:
             try:
                 threading.stack_size(size)
             except (ValueError, RuntimeError):
                 continue
-            thread = threading.Thread(target=_with_limit(target, limit, old_limit),
-                                      name="simpletalk", daemon=True)
+            thread = threading.Thread(target=_with_limit(target, limit), name=name, daemon=True)
             try:
                 thread.start()
             except (RuntimeError, MemoryError):
@@ -116,13 +120,24 @@ def _start(target):
         threading.stack_size(old_size)
 
 
-def _with_limit(target, limit, old_limit):
+_start = start_thread
+
+
+def _with_limit(target, limit):
     def run():
-        # The recursion limit is shared by all threads; raise it only while
-        # SimpleTalk code runs, on the thread whose stack can take it.
-        sys.setrecursionlimit(max(old_limit, limit))
+        # The recursion limit is shared by every thread, so it is raised while
+        # any SimpleTalk worker runs and put back when the last one finishes.
+        global _active, _saved_limit
+        with _limit_lock:
+            if _active == 0:
+                _saved_limit = sys.getrecursionlimit()
+            _active += 1
+            sys.setrecursionlimit(max(sys.getrecursionlimit(), limit))
         try:
             target()
         finally:
-            sys.setrecursionlimit(old_limit)
+            with _limit_lock:
+                _active -= 1
+                if _active == 0 and _saved_limit is not None:
+                    sys.setrecursionlimit(_saved_limit)
     return run

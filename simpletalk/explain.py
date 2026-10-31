@@ -38,6 +38,11 @@ BUILTIN_WORDS = {
     "rev": "{0} reversed",
     "copy": "a copy of {0}",
     "wait": "a pause of {0} seconds",
+    "keys": "the keys of {0}",
+    "values": "the values in {0}",
+    "read": "the text in the file {0}",
+    "load": "the data in the JSON file {0}",
+    "exists": "whether the file {0} exists",
 }
 
 
@@ -66,6 +71,29 @@ def words(node):
         if node.op == "..":
             return f"the numbers from {words(node.left)} to {words(node.right)}"
         return f"{words(node.left)} {OPS[node.op]} {words(node.right)}"
+    if isinstance(node, N.MapLiteral):
+        if not node.items:
+            return "an empty map"
+        return "a map with " + ", ".join(f"{k} = {words(v)}" for k, v in node.items)
+    if isinstance(node, N.Field):
+        return f"the {node.name} of {words(node.target)}"
+    if isinstance(node, N.Lambda):
+        takes = " and ".join(node.params) if node.params else "nothing"
+        return f"a quick function that takes {takes} and gives back {words(node.body)}"
+    if isinstance(node, N.Await):
+        return f"the result of task {node.name} (waiting for it to finish)"
+    if isinstance(node, N.Pipe):
+        text = words(node.value)
+        for stage in node.stages:
+            if stage[0] == "only":
+                text += f", keeping only the items where {words(stage[1])}"
+            elif stage[0] == "each":
+                text += f", turning each item into {words(stage[1])}"
+            else:
+                _, callee, args = stage
+                extra = f" (with {', '.join(words(a) for a in args)})" if args else ""
+                text += f", then passed to {callee.name}{extra}"
+        return text
     if isinstance(node, N.Index):
         index = node.index
         if isinstance(index, N.Literal) and index.value == -1:
@@ -107,6 +135,8 @@ def code(node):
         return "[" + ", ".join(code(i) for i in node.items) + "]"
     if isinstance(node, N.Text):
         return '"' + "".join(p if isinstance(p, str) else "{" + code(p) + "}" for p in node.parts) + '"'
+    if isinstance(node, N.Field):
+        return f"{code(node.target)}.{node.name}"
     return "..."
 
 
@@ -135,7 +165,7 @@ def sentence(node):
     if isinstance(node, N.Add):
         return f"Put {words(node.value)} at the end of the list {words(node.target)}.", []
     if isinstance(node, N.Remove):
-        return f"Delete the first {words(node.value)} from the list {words(node.target)}.", []
+        return f"Delete {words(node.value)} from {words(node.target)}.", []
     if isinstance(node, N.If):
         parts = []
         for i, (cond, body) in enumerate(node.branches):
@@ -175,6 +205,33 @@ def sentence(node):
         return "From now on, report every change to " + " and ".join(node.names) + ".", []
     if isinstance(node, N.Test):
         return f"Check that {words(node.expr)}; stop with a message if it isn't true.", []
+    if isinstance(node, N.Try):
+        handler = "Otherwise, if something went wrong"
+        if node.err_name:
+            handler += f" (the message goes in {node.err_name})"
+        return "Try this:", [(None, node.body), (handler + ":", node.handler)]
+    if isinstance(node, N.Oops):
+        return f"Stop with the problem message {words(node.message)}.", []
+    if isinstance(node, N.Pick):
+        parts = []
+        for i, (patterns, body) in enumerate(node.cases):
+            options = " or ".join(
+                f"between {words(p.left)} and {words(p.right)}"
+                if isinstance(p, N.Binary) and p.op == ".." else words(p) for p in patterns)
+            parts.append((f"If it is {options}:", body))
+        if node.else_body is not None:
+            parts.append(("If it is anything else:", node.else_body))
+        return f"Look at {words(node.value)}.", parts
+    if isinstance(node, N.Use):
+        return f"Bring in everything from the file {words(node.path)}.", []
+    if isinstance(node, N.Keep):
+        return (f"Remember {node.name} between runs (it starts as {words(node.default)} the first time).",
+                [])
+    if isinstance(node, N.Task):
+        return f"Start a task called {node.name} that runs alongside the rest of the program. It will:", \
+            [(None, node.body)]
+    if isinstance(node, N.ExprStatement) and isinstance(node.expr, N.Await):
+        return f"Wait for task {node.expr.name} to finish.", []
     if isinstance(node, N.ExprStatement):
         expr = node.expr
         if isinstance(expr, N.Call) and isinstance(expr.callee, N.Name):

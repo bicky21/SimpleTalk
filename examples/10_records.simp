@@ -1,0 +1,21 @@
+;; Maps hold named values. Read them with .name, change them with let.
+let student {name: "Bicky", marks: 82, subjects: ["DSA", "OS"]}
+out "{student.name} scored {student.marks}"
+
+let student.marks 91
+let student.city "Kolkata"
+add student.subjects "DBMS"
+
+loop key student
+    out key, "=", student[key]
+.
+
+;; pick chooses by value: exact matches or a range
+pick student.marks
+is 90..100
+    out "Grade A"
+is 75..89
+    out "Grade B"
+else
+    out "Keep practising"
+.

@@ -47,6 +47,34 @@ class Binary(Node):
 
 
 @dataclass
+class MapLiteral(Node):
+    items: list            # list of (key text, value node)
+
+
+@dataclass
+class Field(Node):
+    target: Node
+    name: str              # me.name
+
+
+@dataclass
+class Pipe(Node):
+    value: Node
+    stages: list           # ("only", expr) | ("each", expr) | ("call", callee, args)
+
+
+@dataclass
+class Lambda(Node):
+    params: list
+    body: Node             # fn a b -> a + b
+
+
+@dataclass
+class Await(Node):
+    name: str
+
+
+@dataclass
 class Call(Node):
     callee: Node
     args: list
@@ -152,6 +180,42 @@ class Watch(Node):
 class Test(Node):
     expr: Node
     text: str                   # the check as written, shown when it fails
+
+
+@dataclass
+class Try(Node):
+    body: list
+    err_name: str | None
+    handler: list
+
+
+@dataclass
+class Oops(Node):
+    message: Node
+
+
+@dataclass
+class Use(Node):
+    path: Node
+
+
+@dataclass
+class Pick(Node):
+    value: Node
+    cases: list            # list of (patterns, body)
+    else_body: list | None
+
+
+@dataclass
+class Keep(Node):
+    name: str
+    default: Node
+
+
+@dataclass
+class Task(Node):
+    name: str
+    body: list
 
 
 @dataclass

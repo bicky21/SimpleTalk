@@ -1,0 +1,23 @@
+;; try runs some code; if anything goes wrong, the fail part runs instead.
+try
+    let age num("twenty")
+fail why
+    out "That didn't work:", why
+.
+
+;; oops stops with your own message, and try can catch it.
+fn withdraw balance amount
+    when amount > balance
+        oops "Not enough money: you have {balance}, you asked for {amount}"
+    .
+    ret balance - amount
+.
+
+let balance 500
+try
+    let balance withdraw(balance, 200)
+    let balance withdraw(balance, 900)
+fail why
+    out why
+.
+out "Balance is still", balance

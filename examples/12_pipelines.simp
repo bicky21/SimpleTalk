@@ -1,0 +1,16 @@
+;; A pipeline passes a value through steps, left to right.
+;;   | only CHECK   keeps the items where CHECK is true ('it' is the item)
+;;   | each VALUE   turns every item into VALUE
+;;   | fn_name      passes the whole value to a function
+let scores [70, 95, 40, 82, 55]
+
+out scores | only it >= 60 | sort
+out scores | each it + 5 | max
+out scores | only it < 60 | len, "students need help"
+
+;; fn ... -> ... makes a quick one-line function you can store and pass around
+let bonus fn s -> s * 1.1
+out scores | each round(bonus(it)) | sum
+
+let names ["asha", "ravi", "meera"]
+out names | each upper(it) | join(", ")

@@ -1,0 +1,14 @@
+;; Files are found next to this program.
+write("shopping.txt", "milk\neggs\nbread")
+let items split(read("shopping.txt"), "\n")
+out "Shopping list has", len(items), "items"
+
+;; save and load turn lists and maps into JSON files and back.
+save("profile.json", {name: "Bicky", langs: ["SimpleTalk", "Python"]})
+let profile load("profile.json")
+out profile.name, "knows", join(profile.langs, " and ")
+
+;; keep remembers a value between runs (saved in 14_files_and_memory.memory.json).
+keep runs 0
+up runs
+out "You have run this program {runs} time(s)."

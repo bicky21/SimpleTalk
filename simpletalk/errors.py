@@ -20,9 +20,13 @@ class SimpleTalkError(Exception):
         self.line = line
         self.column = column
         self.hint = hint
+        self.source = None      # set when the problem is in another file (see `use`)
+        self.filename = None
 
     def pretty(self, source=None, filename=None):
         """Return a friendly, multi-line description of the error."""
+        if self.source is not None:            # the problem is inside a `use`d file
+            source, filename = self.source, self.filename
         where = ""
         if self.line is not None:
             where = f" on line {self.line}"
@@ -66,6 +70,12 @@ class RuntimeProblem(SimpleTalkError):
     """The code is valid, but something went wrong while running it."""
 
     kind = "Something went wrong while running"
+
+
+class UserProblem(RuntimeProblem):
+    """Raised by the program itself with `oops "message"`."""
+
+    kind = "The program stopped"
 
 
 def did_you_mean(word, choices):

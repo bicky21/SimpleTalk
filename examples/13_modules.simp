@@ -1,0 +1,6 @@
+;; use brings in the functions and values from another .simp file.
+use "lib/geometry"
+
+out "Circle:", circle_area(2)
+out "Rectangle:", rect_area(3, 4)
+out "pi is about", pi

@@ -1,0 +1,16 @@
+;; A task runs side by side with the rest of the program.
+task kettle
+    wait(0.3)
+    out "Kettle: water boiled"
+    ret "hot water"
+.
+
+task toast
+    wait(0.1)
+    out "Toaster: toast ready"
+.
+
+out "Me: setting the table while I wait..."
+let water await kettle
+out "Me: making tea with", water
+;; tasks that are never awaited still finish before the program ends

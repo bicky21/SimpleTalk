@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/bicky21/SimpleTalk/actions/workflows/tests.yml"><img src="https://github.com/bicky21/SimpleTalk/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/version-2.1.0-1C2A52" alt="Version 2.1.0">
+  <img src="https://img.shields.io/badge/version-2.2.0-1C2A52" alt="Version 2.2.0">
   <img src="https://img.shields.io/badge/python-3.10%2B-2F67B1" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/dependencies-none-66728C" alt="No dependencies">
 </p>
@@ -13,13 +13,14 @@
   <a href="#quick-start">Quick start</a> ·
   <a href="#what-makes-simpletalk-different">What's different</a> ·
   <a href="#the-language-in-one-minute">The language</a> ·
+  <a href="#advanced-features-on-modest-hardware">Advanced features</a> ·
   <a href="docs/LANGUAGE.md">Full guide</a> ·
   <a href="examples">Examples</a>
 </p>
 
 ---
 
-SimpleTalk is a small programming language for people writing their first programs. It uses **24 short words**, closes every block with **a single dot**, and when something goes wrong it shows **where, why, and how to fix it**. It runs on plain Python with nothing else to install.
+SimpleTalk is a small programming language for people writing their first programs. Every keyword is **2–5 letters**, every block closes with **a single dot**, and when something goes wrong it shows **where, why, and how to fix it**. It still grows with you: maps, pipelines, pattern matching, error handling, modules, files, JSON and concurrent tasks are all built in. It runs on plain Python with nothing else to install, in about 17 MB of memory.
 
 ```
 fn square n
@@ -175,6 +176,7 @@ Every error points at the exact spot and suggests a fix. It catches spelling sli
 | Make a function           | `fn greet name` … `ret` … `.`              |
 | Watch a variable          | `watch score`                              |
 | Check your code           | `test score = 10`                          |
+| Store named values        | `let me {name: "Bicky"}` then `me.name`  |
 | Comment                   | `;; a note`                                |
 
 That's nearly the whole language. The [full guide](docs/LANGUAGE.md) covers every keyword and built-in function, and includes a table for moving over from Python.
@@ -192,11 +194,86 @@ That's nearly the whole language. The [full guide](docs/LANGUAGE.md) covers ever
 | [07_guess_the_number](examples/07_guess_the_number.simp) | A complete little game |
 | [08_fizzbuzz](examples/08_fizzbuzz.simp) | The classic exercise |
 | [09_superpowers](examples/09_superpowers.simp) | `watch`, `test` and smart input |
+| [10_records](examples/10_records.simp) | Maps and `pick` |
+| [11_errors](examples/11_errors.simp) | `try`, `fail` and `oops` |
+| [12_pipelines](examples/12_pipelines.simp) | Pipelines and quick functions |
+| [13_modules](examples/13_modules.simp) | `use` with a small library |
+| [14_files_and_memory](examples/14_files_and_memory.simp) | Files, JSON and `keep` |
+| [15_tasks](examples/15_tasks.simp) | Tasks running side by side |
+
+## Advanced features on modest hardware
+
+The features people usually reach for a "serious" language to get are all part of SimpleTalk, with the same short words. The whole interpreter is pure Python with no dependencies. "Hello, World!" starts in well under a tenth of a second and peaks around 17 MB of memory, so an old laptop or a Raspberry Pi is plenty.
+
+**Maps**: named values, nested freely with lists.
+```
+let me {name: "Bicky", skills: ["Python"]}
+add me.skills "SimpleTalk"
+out "{me.name} knows {len(me.skills)} languages"
+```
+
+**Pipelines and quick functions**: transform data step by step, no loops needed.
+```
+out scores | only it >= 60 | each it * 2 | sort
+let double fn n -> n * 2
+```
+
+**Pattern matching**: choose by value or range.
+```
+pick marks
+is 90..100
+    out "A"
+is 75..89
+    out "B"
+else
+    out "Keep going"
+.
+```
+
+**Error handling**: catch problems, or raise your own.
+```
+try
+    let n num("twenty")
+fail why
+    out "Couldn't convert:", why
+.
+oops "Not enough money"
+```
+
+**Modules**: split a program across files.
+```
+use "lib/geometry"
+out circle_area(2)
+```
+
+**Files and JSON**: one call each.
+```
+save("profile.json", {name: "Bicky", level: 3})
+let profile load("profile.json")
+```
+
+**Remembered values**: a value that survives between runs, with no database.
+```
+keep high_score 0
+when score > high_score
+    let high_score score
+.
+```
+
+**Tasks**: do things side by side.
+```
+task download
+    wait(2)
+    ret "data"
+.
+out "Working while it downloads..."
+let result await download
+```
 
 ## Built to be stable
 
 - **No raw Python errors.** Every problem becomes a SimpleTalk message. The interpreter is fuzz-tested with tens of thousands of random programs.
-- **Guard rails.** Runaway recursion, endless input and huge ranges all stop with a clear explanation instead of freezing.
+- **Guard rails.** Runaway recursion, endless input and huge ranges all stop with a clear explanation instead of freezing. Deep recursion is safe even on Windows' small default stack, and Ctrl+C stops any program cleanly, including one that is waiting for input or running tasks.
 - **Locked-in behaviour.** A test suite covers the language, the examples and the error messages, and runs on Linux and Windows for every push.
 - **Compatibility promise.** Within 2.x, working programs keep working. See the [changelog](CHANGELOG.md).
 
@@ -213,9 +290,10 @@ run('out "Hello from Python!"')
 simpletalk/
   lexer.py        text   → tokens
   parser.py       tokens → syntax tree, with friendly syntax errors
-  interpreter.py  runs the tree: watch, test, smart input, runtime errors
+  interpreter.py  runs the tree: maps, pipelines, try, use, keep, tasks, watch, test
+  runner.py       runs programs on a big-stack thread; Ctrl+C and input handling
   explain.py      syntax tree → plain English (--explain)
-  builtins.py     len, sort, rand, … (23 functions)
+  builtins.py     len, sort, rand, keys, … (plus read/write/load/save in the interpreter)
   cli.py          the simpletalk command and playground
 ```
 

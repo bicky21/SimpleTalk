@@ -1,9 +1,9 @@
-# The SimpleTalk Language Guide (version 2.1)
+# The SimpleTalk Language Guide (version 2.2)
 
 SimpleTalk is designed around three rules:
 
 1. **Type less.** Every keyword is 2–5 letters: `let`, `out`, `when`, `loop`, `fn`.
-2. **One way to do each thing.** Only **24 keywords** and **23 built-in functions** — this page lists all of them.
+2. **One way to do each thing.** Only **33 keywords** and **30 built-in functions** — this page lists all of them.
 3. **Never crash with a scary error.** Every mistake gets a line number, a `^` marker and a hint.
 
 ---
@@ -68,8 +68,10 @@ Keywords are lowercase. Names are case-sensitive: `score` and `Score` are differ
 | text   | `"hello"`, `'hi'`           | `{name}` inside text inserts a value        |
 | bool   | `true`, `false`             | the answer to a question like `x > 3`       |
 | list   | `[1, 2, 3]`, `[]`, `1..5`   | positions start at **1**                    |
+| map    | `{name: "Bicky", age: 20}`  | named values: `me.name`, `me["name"]`       |
 | none   | `none`                      | "no value"                                  |
-| fn     | `fn ...`, `len`             | something you can call with `( )`           |
+| fn     | `fn ...`, `fn n -> n * 2`   | something you can call with `( )`           |
+| task   | `task ... .`                | something running alongside the program     |
 
 ### Text tricks
 ```
@@ -183,7 +185,148 @@ hello()
 - Inputs belong to the function. `let` inside a function changes an outer variable **if it already exists**; otherwise it makes one that only lives inside the function.
 - Functions can call themselves up to 1000 levels deep.
 
-## 10. Watching and testing
+## 10. Maps
+
+A map keeps values under names (keys), like a contact card.
+
+```
+let me {name: "Bicky", age: 20, "fav food": "momo"}
+out me.name                  ;; Bicky
+out me["fav food"]           ;; keys with spaces use [ ]
+let me.age 21                ;; change a value
+let me.city "Kolkata"        ;; add a new key
+del me "city"                ;; remove a key
+out me has "age"             ;; true
+out len(me), keys(me), values(me)
+loop key me                  ;; goes through the keys
+    out key, me[key]
+.
+```
+
+Keys are names or text. Maps and lists can hold each other: `let s {tags: ["a"]}` then `add s.tags "b"`.
+The rule for the dot: `me.name` (dot touching both sides) reads a value; a `.` alone on a line closes a block.
+
+## 11. Pipelines and quick functions
+
+A pipeline passes a value through steps from left to right with `|`.
+
+```
+let scores [70, 95, 40, 82]
+out scores | only it > 50 | each it * 2 | sort    ;; [140, 164, 190]
+out "a,b,c" | split(",") | join("-")              ;; a-b-c
+```
+
+| Step              | Does                                                      |
+|-------------------|-----------------------------------------------------------|
+| `\| only CHECK`   | keeps the items where CHECK is true (`it` is the item)    |
+| `\| each VALUE`   | turns every item into VALUE                               |
+| `\| name`         | calls `name(value)`; `\| join(", ")` calls `join(value, ", ")` |
+
+`fn inputs -> value` makes a quick one-line function you can store or pass around:
+
+```
+let double fn n -> n * 2
+out double(21)                       ;; 42
+out scores | each double(it)
+fn apply f x
+    ret f(x)
+.
+out apply(fn n -> n * n, 7)          ;; 49
+```
+
+## 12. Choosing with pick
+
+`pick` compares one value against several choices. A choice can list several values, or a range.
+
+```
+pick day
+is "sat", "sun"
+    out "weekend"
+is 1..5
+    out "weekday number"
+else
+    out "unknown"
+.
+```
+
+The first matching `is` runs. One dot closes the whole `pick`.
+
+## 13. Handling problems: try, fail, oops
+
+```
+try
+    let age num("twenty")
+fail why
+    out "That didn't work:", why       ;; why holds the problem message
+.
+```
+
+`oops "message"` stops the program with your own message, and `try` can catch it:
+
+```
+fn withdraw balance amount
+    when amount > balance
+        oops "Not enough money"
+    .
+    ret balance - amount
+.
+```
+
+`fail` can leave out the name (`fail` on its own) if you don't need the message.
+`try` catches problems while running; mistakes in how the code is written are still reported before it runs.
+
+## 14. Using other files
+
+```
+use "lib/geometry"          ;; runs lib/geometry.simp once and brings in its names
+out circle_area(2)
+```
+
+The path is relative to the program's folder, and `.simp` can be left out.
+Names starting with `_` stay private to their file. If a problem happens inside a used file, the message shows that file and line.
+
+## 15. Files and JSON
+
+| Function                 | Does                                                  |
+|--------------------------|-------------------------------------------------------|
+| `read("notes.txt")`      | the text in a file                                    |
+| `write("notes.txt", t)`  | saves text to a file (replacing it)                   |
+| `load("data.json")`      | reads a JSON file into lists and maps                 |
+| `save("data.json", v)`   | writes lists, maps, numbers, text, true/false, none   |
+| `exists("notes.txt")`    | `true` if the file is there                           |
+
+File names are relative to the program's folder, so a program finds its files wherever you run it from.
+
+## 16. Remembered values: keep
+
+```
+keep visits 0           ;; 0 the first time; after that, the value from last time
+up visits
+out "You have run this {visits} times"
+```
+
+Kept values are saved when the program ends (even if it stops with a problem) in a file next to it:
+`game.simp` saves to `game.memory.json`. Delete that file to start fresh.
+In the playground, `keep` works but nothing is saved.
+
+## 17. Tasks: doing things side by side
+
+```
+task kettle
+    wait(0.3)
+    out "water boiled"
+    ret "hot water"
+.
+out "setting the table..."       ;; runs while the kettle task waits
+let water await kettle           ;; wait for the task and get what it gave back
+```
+
+- A task starts straight away and runs alongside the rest of the program.
+- `await name` waits for it to finish; `let x await name` also takes its `ret` value.
+- Tasks share variables with the program. Tasks you never `await` still finish before the program ends.
+- If a task hits a problem, it shows up at `await` (where `try` can catch it) or when the program ends.
+
+## 18. Watching and testing
 
 These are built into the language, so they work with no setup.
 
@@ -213,7 +356,7 @@ A failing test stops the program and shows both sides:
   Hint: The left side is 6 and the right side is 9.
 ```
 
-## 11. The simpletalk command
+## 19. The simpletalk command
 
 | Command                         | Does                                                   |
 |---------------------------------|--------------------------------------------------------|
@@ -223,7 +366,7 @@ A failing test stops the program and shows both sides:
 | `simpletalk --check file.simp`  | look for mistakes without running                      |
 | `simpletalk`                    | the playground: type code, see results straight away   |
 
-## 12. Built-in functions
+## 20. Built-in functions
 
 | Function                | Example                                 |
 |-------------------------|-----------------------------------------|
@@ -248,19 +391,24 @@ A failing test stops the program and shows both sides:
 | `rev(x)`                | `rev("abc")` → `"cba"` (new value)      |
 | `copy(list)`            | a separate copy of a list               |
 | `wait(seconds)`         | `wait(0.5)` pauses half a second        |
+| `keys(map)` / `values(map)` | `keys({a: 1})` → `["a"]`            |
+| `read` `write` `load` `save` `exists` | see "Files and JSON"      |
 
-## 13. All 24 keywords
+## 21. All 33 keywords
 
 ```
 let up out in add del
 when else loop while stop skip fn ret
-watch test
+watch test try fail oops pick is
+use keep task await
 and or not has mod true false none
 ```
 
+`only`, `each` and `it` have a special meaning inside pipelines but are not reserved.
+
 These can't be used as variable names.
 
-## 14. Coming from Python (or SimpleTalk 1.0)?
+## 22. Coming from Python (or SimpleTalk 1.0)?
 
 | Python                    | SimpleTalk 1.0            | SimpleTalk 2.0        |
 |---------------------------|---------------------------|-----------------------|
@@ -283,10 +431,19 @@ These can't be used as variable names.
 | `items[0]`                | `items[1]`                | `items[1]`            |
 | `# comment`               | `# comment`               | `;; comment`          |
 | `None`                    | `nothing`                 | `none`                |
+| `d = {"a": 1}` / `d["a"]` | –                         | `let d {a: 1}` / `d.a` |
+| `try:` / `except E as e:` | –                         | `try` / `fail e`      |
+| `raise ValueError("x")`   | –                         | `oops "x"`            |
+| `match x:` / `case 1:`    | –                         | `pick x` / `is 1`     |
+| `lambda n: n * 2`         | –                         | `fn n -> n * 2`       |
+| `[x*2 for x in l if x>1]` | –                         | `l \| only it > 1 \| each it * 2` |
+| `import shapes`           | –                         | `use "shapes"`        |
+| `json.load(open(f))`      | –                         | `load(f)`             |
+| `asyncio.create_task(...)` / `await t` | –            | `task t ... .` / `await t` |
 
 If you type a word from another language by mistake, SimpleTalk tells you the right one.
 
-## 15. Stability promise
+## 23. Stability promise
 
 From version 2.0, programs that work keep working:
 - Keywords and built-in names won't be renamed or removed in any 2.x release.
