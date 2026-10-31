@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{title}} – SimpleTalk Manual</title>
+<meta name="description" content="The SimpleTalk manual: a tiny, friendly programming language for people learning to code.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F1F5FB;
+    --paper-raised: #FAFCFF;
+    --rule: #D3DEEC;
+    --margin: #E2687A;
+    --ink: #1C2A52;
+    --text: #27355C;
+    --pencil: #5E6A85;
+    --highlight: #FFD447;
+    --link: #2F67B1;
+    --problem: #B4233C;
+    --problem-bg: #FCEBEE;
+    --note: #2C6B3F;
+    --orange: #B2531F;
+    --purple: #8A4FB8;
+    --line-h: 26px;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+    --serif: "Fraunces", Georgia, serif;
+    --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #121A33;
+      --paper-raised: #182244;
+      --rule: #243159;
+      --margin: #C9566A;
+      --ink: #E9EEF8;
+      --text: #CDD6EA;
+      --pencil: #9AA6C2;
+      --link: #8DB4F0;
+      --problem: #FF9AAB;
+      --problem-bg: #3A1B2A;
+      --note: #8FD6A3;
+      --orange: #F2B27A;
+      --purple: #CDA6F0;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-padding-top: 80px; }
+  body { margin: 0; background: var(--paper); color: var(--text); font: 17px/1.65 var(--ui); }
+  a { color: var(--link); text-underline-offset: 2px; }
+  :focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
+
+  /* ------------------------------------------------ top bar */
+  .top {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 16px;
+    padding: 12px 24px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--rule);
+  }
+  .wordmark {
+    font: 600 26px var(--serif); letter-spacing: -0.4px; color: var(--ink);
+    text-decoration: none; display: flex; align-items: baseline; gap: 3px;
+  }
+  .wordmark .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--highlight); display: inline-block; }
+  .wordmark small { font: 400 18px var(--serif); color: var(--pencil); margin-left: 9px; }
+  .top nav { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .top nav a {
+    font: 500 15px var(--ui); text-decoration: none; color: var(--ink);
+    padding: 7px 14px; border-radius: 8px; border: 1px solid var(--rule); background: var(--paper-raised);
+  }
+  .top nav a.play { background: var(--highlight); border-color: var(--highlight); color: #1C2A52; font-weight: 700; }
+  #menu { display: none; font: 500 15px var(--ui); color: var(--ink); background: var(--paper-raised);
+    border: 1px solid var(--rule); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+
+  /* ------------------------------------------------ layout */
+  .layout {
+    display: grid;
+    grid-template-columns: 270px minmax(0, 1fr) 220px;
+    max-width: 1320px; margin: 0 auto;
+  }
+  .side {
+    position: sticky; top: 61px; align-self: start;
+    height: calc(100vh - 61px); overflow-y: auto;
+    padding: 20px 20px 40px 24px;
+    border-right: 1px solid var(--rule);
+  }
+  .side input {
+    width: 100%; font: 15px var(--ui); color: var(--ink);
+    background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 8px;
+    padding: 8px 10px; margin-bottom: 14px;
+  }
+  .side .home { display: block; font-weight: 600; text-decoration: none; color: var(--ink); padding: 4px 8px; border-radius: 6px; }
+  .side .group { font: 600 13px var(--ui); color: var(--pencil); margin: 18px 0 4px 8px; }
+  .side ol { list-style: none; margin: 0; padding: 0; }
+  .side li a {
+    display: flex; gap: 10px; align-items: baseline;
+    padding: 4px 8px; border-radius: 6px;
+    text-decoration: none; color: var(--text); font-size: 15px; line-height: 1.4;
+  }
+  .side li a .n { font: 12px var(--mono); color: var(--pencil); min-width: 16px; text-align: right; }
+  .side a:hover { background: var(--paper-raised); }
+  .side a.current { background: var(--paper-raised); color: var(--ink); font-weight: 600; box-shadow: inset 3px 0 0 var(--highlight); }
+  #results { list-style: none; padding: 0; margin: 0; }
+  #results li a { display: block; padding: 6px 8px; border-radius: 6px; text-decoration: none; color: var(--ink); }
+  #results li a:hover { background: var(--paper-raised); }
+  #results small { display: block; color: var(--pencil); font-size: 13px; line-height: 1.4; }
+  #results .none { color: var(--pencil); padding: 6px 8px; font-size: 15px; }
+
+  main { padding: 36px 48px 80px; min-width: 0; }
+  .content { max-width: 74ch; }
+  .chapter { font: 500 15px var(--ui); color: var(--pencil); margin: 0 0 4px; }
+  h1 { font: 600 44px/1.15 var(--serif); color: var(--ink); letter-spacing: -0.6px; margin: 0 0 24px; }
+  h2 { font: 600 28px/1.25 var(--serif); color: var(--ink); margin: 48px 0 12px; }
+  h3 { font: 600 20px/1.3 var(--serif); color: var(--ink); margin: 32px 0 8px; }
+  p, li { max-width: 72ch; }
+  strong { color: var(--ink); }
+  code { font: 0.88em var(--mono); background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 4px; padding: 1px 5px; }
+  table { border-collapse: collapse; margin: 16px 0 24px; font-size: 15.5px; display: block; overflow-x: auto; max-width: 100%; }
+  th, td { text-align: left; padding: 8px 14px 8px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-weight: 600; color: var(--ink); }
+  td code, th code { white-space: nowrap; }
+  pre { margin: 0; overflow-x: auto; }
+  main > .content > pre, .content > pre {
+    font: 14px/1.6 var(--mono); background: var(--paper-raised); border: 1px solid var(--rule);
+    border-radius: 8px; padding: 12px 16px; margin: 16px 0;
+  }
+  .content > pre code { border: 0; background: none; padding: 0; font-size: inherit; }
+
+  /* ------------------------------------------------ examples: code on ruled notebook paper */
+  figure { margin: 18px 0 0; border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; background: var(--paper-raised); }
+  figure + figure { margin-top: -1px; border-top-left-radius: 0; border-top-right-radius: 0; }
+  figure.code:has(+ figure) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  figure + :not(figure) { margin-top: 18px; }
+  figcaption {
+    display: flex; align-items: center; gap: 10px;
+    font: 500 13px var(--ui); color: var(--pencil);
+    padding: 6px 8px 6px 14px; border-bottom: 1px solid var(--rule);
+  }
+  figcaption .answers { margin-left: auto; font: 12px var(--mono); }
+  .try {
+    margin-left: auto; font: 700 13px var(--ui); color: #1C2A52; text-decoration: none;
+    background: var(--highlight); padding: 4px 12px; border-radius: 6px;
+  }
+  .answers + .try { margin-left: 0; }
+  figure pre code { border: 0; background: none; padding: 0; font: inherit; border-radius: 0; }
+  figure.code pre {
+    font: 14.5px/var(--line-h) var(--mono); color: var(--ink);
+    padding: 0 16px 0 30px;
+    background:
+      linear-gradient(to right, transparent 16px, var(--margin) 16px, var(--margin) 18px, transparent 18px),
+      repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--line-h) - 1px), var(--rule) calc(var(--line-h) - 1px), var(--rule) var(--line-h));
+  }
+  figure.output pre { font: 14px/1.6 var(--mono); color: var(--text); padding: 10px 16px 12px; white-space: pre; }
+  figure.output { background: var(--paper); }
+  figure.problem pre { color: var(--problem); }
+  figure.problem { background: var(--problem-bg); border-color: color-mix(in srgb, var(--problem) 35%, transparent); }
+  .t-kw { font-weight: 700; color: var(--ink); }
+  .t-def { font-weight: 700; color: var(--link); }
+  .t-str { color: var(--link); }
+  .t-num, .t-atom { color: var(--orange); }
+  .t-com { color: var(--pencil); font-style: italic; }
+  .t-fn { color: var(--note); }
+  .t-op { color: var(--pencil); }
+  .t-it { color: var(--purple); }
+  .t-dot { background: var(--highlight); color: #1C2A52; border-radius: 50%; padding: 0 5px; font-weight: 700; }
+
+  /* ------------------------------------------------ on this page, pager, footer */
+  .toc { position: sticky; top: 61px; align-self: start; padding: 36px 20px 20px 8px; font-size: 14px; }
+  .toc p { font-weight: 600; color: var(--ink); margin: 0 0 8px; }
+  .toc ul { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--rule); }
+  .toc li a { display: block; padding: 3px 0 3px 12px; color: var(--pencil); text-decoration: none; line-height: 1.4; }
+  .toc li a:hover { color: var(--ink); }
+  .pager { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 64px; max-width: 74ch; }
+  .pager a { display: block; text-decoration: none; padding: 14px 16px; border: 1px solid var(--rule); border-radius: 10px; color: var(--ink); font-weight: 600; background: var(--paper-raised); }
+  .pager a small { display: block; font-weight: 400; color: var(--pencil); font-size: 13px; }
+  .pager .next { text-align: right; }
+  .pager a:hover { border-color: var(--pencil); }
+  .foot { margin-top: 40px; font-size: 14px; color: var(--pencil); max-width: 74ch; }
+
+  @media (max-width: 1200px) {
+    .layout { grid-template-columns: 260px minmax(0, 1fr); }
+    .toc { display: none; }
+  }
+  @media (max-width: 860px) {
+    .top { padding: 10px 16px; gap: 10px; }
+    .wordmark { font-size: 22px; }
+    .wordmark small { font-size: 16px; }
+    .top nav a.gh { display: none; }
+    #menu { display: inline-block; }
+    .layout { display: block; }
+    .side {
+      display: none; position: fixed; top: 55px; left: 0; right: 0; bottom: 0;
+      height: calc(100vh - 55px); height: calc(100dvh - 55px);
+      background: var(--paper); z-index: 9; border-right: 0;
+    }
+    body.menu-open { overflow: hidden; }
+    .top nav a, #menu { padding: 6px 10px; font-size: 14px; }
+    body.menu-open .side { display: block; }
+    main { padding: 24px 16px 60px; }
+    h1 { font-size: 34px; }
+    h2 { font-size: 24px; }
+    .pager { grid-template-columns: 1fr; }
+    .pager .next { text-align: left; }
+  }
+  @media (max-width: 430px) {
+    .wordmark small { display: none; }
+  }
+  /* Last on purpose: show >= and -> exactly as typed, never as joined symbols.
+     (The font shorthands above would otherwise switch ligatures back on.) */
+  code, pre, figure pre code { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="wordmark" href="index.html">SimpleTalk<span class="dot" aria-hidden="true"></span><small>Manual</small></a>
+  <nav>
+    <button id="menu" type="button" aria-expanded="false" aria-controls="side">Chapters</button>
+    <a class="play" href="../">Playground</a>
+    <a class="gh" href="https://github.com/bicky21/SimpleTalk">GitHub</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside class="side" id="side" aria-label="Chapters">
+    <input id="search" type="search" placeholder="Search the manual" aria-label="Search the manual" autocomplete="off">
+    <ul id="results" hidden></ul>
+    <nav id="chapters">
+{{nav}}
+    </nav>
+  </aside>
+
+  <main>
+    <article class="content">
+      {{chapter}}
+      <h1>{{heading}}</h1>
+{{body}}
+    </article>
+    {{pager}}
+    <p class="foot">Found a mistake in this page? <a href="{{source}}">Edit it on GitHub</a>.
+      Every example on this page is run automatically, so what you see is what SimpleTalk prints.</p>
+  </main>
+  {{toc}}
+</div>
+
+<script>
+(() => {
+  // Phone menu
+  const menu = document.getElementById("menu");
+  menu.addEventListener("click", () => {
+    const open = document.body.classList.toggle("menu-open");
+    menu.setAttribute("aria-expanded", open);
+    menu.textContent = open ? "Close" : "Chapters";
+  });
+
+  // Search: plain text match across every page, no server needed
+  const input = document.getElementById("search");
+  const results = document.getElementById("results");
+  const chapters = document.getElementById("chapters");
+  let index = null;
+  async function load() {
+    if (!index) index = await (await fetch("search.json")).json();
+    return index;
+  }
+  function snippet(text, at, len) {
+    const start = Math.max(0, at - 40);
+    return (start > 0 ? "…" : "") + text.slice(start, at + len + 60).trim() + "…";
+  }
+  input.addEventListener("focus", load, { once: true });
+  input.addEventListener("input", async () => {
+    const q = input.value.trim().toLowerCase();
+    if (!q) { results.hidden = true; chapters.hidden = false; return; }
+    const pages = await load();
+    const hits = [];
+    for (const p of pages) {
+      const inTitle = p.title.toLowerCase().includes(q);
+      const at = p.text.toLowerCase().indexOf(q);
+      if (inTitle || at >= 0) hits.push({ p, score: inTitle ? 0 : 1, at });
+    }
+    hits.sort((a, b) => a.score - b.score);
+    results.replaceChildren(...(hits.length ? hits.slice(0, 12).map(({ p, at }) => {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = p.url;
+      a.textContent = p.title;
+      if (at >= 0) {
+        const s = document.createElement("small");
+        s.textContent = snippet(p.text, at, q.length);
+        a.append(s);
+      }
+      li.append(a);
+      return li;
+    }) : [Object.assign(document.createElement("li"), { className: "none", textContent: "Nothing found." })]));
+    results.hidden = false;
+    chapters.hidden = true;
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { const first = results.querySelector("a"); if (first) location.href = first.href; }
+    if (e.key === "Escape") { input.value = ""; input.dispatchEvent(new Event("input")); }
+  });
+})();
+</script>
+</body>
+</html>

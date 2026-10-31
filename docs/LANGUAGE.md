@@ -1,4 +1,7 @@
-# The SimpleTalk Language Guide (version 2.2)
+# The SimpleTalk Language Guide (version 2.3)
+
+> This is the one-page summary. For a step-by-step guide with runnable examples, read the
+> [SimpleTalk Manual](https://bicky21.github.io/SimpleTalk/manual/).
 
 SimpleTalk is designed around three rules:
 

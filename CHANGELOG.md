@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.3.2 – 2026-10-31
+
+### Added
+- **The SimpleTalk Manual**: 17 chapters plus a home page in `docs/manual/`, published at
+  https://bicky21.github.io/SimpleTalk/manual/ with search, a contents panel, light/dark themes,
+  phone layout, and a **Try it** button on every example (it opens the playground, with any
+  answers for `in` filled in).
+- Every example in the manual is run by the test suite and its output compared with the page.
+
+### Fixed
+- The playground and manual show `>=` and `->` exactly as typed (no font ligatures).
+- Playground links can carry answers for `in` (`#code=...&answers=...`).
+
 ## 2.3.1 – 2026-10-31
 
 ### Added

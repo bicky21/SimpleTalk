@@ -43,6 +43,20 @@ def main():
         shutil.copy(ROOT / "playground" / name, SITE / name)
     (SITE / ".nojekyll").write_text("")
     print(f"Built {SITE} with {len(engine)} engine files and {len(examples)} examples.")
+    build_manual()
+
+
+def build_manual():
+    """The manual goes to _site/manual/ (needs `pip install markdown`)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("build_manual", ROOT / "docs" / "build_manual.py")
+    try:
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    except ImportError:
+        print("Skipped the manual: install the markdown package (pip install markdown) to build it.")
+        return
+    print(f"Built {module.build(SITE / 'manual')} manual pages into {SITE / 'manual'}.")
 
 
 if __name__ == "__main__":

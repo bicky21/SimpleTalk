@@ -87,7 +87,7 @@
     margin-left: 10px;
   }
   .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; align-items: center; }
-  .toolbar select, .toolbar button {
+  .toolbar select, .toolbar button, .toolbar a {
     height: 38px;
     padding: 0 14px;
     border-radius: 8px;
@@ -95,7 +95,8 @@
     background: var(--paper-raised);
     cursor: pointer;
   }
-  .toolbar button:hover, .toolbar select:hover { border-color: var(--pencil); }
+  .toolbar button:hover, .toolbar select:hover, .toolbar a:hover { border-color: var(--pencil); }
+  .toolbar a { display: inline-flex; align-items: center; font: 500 15px var(--ui); color: var(--ink); text-decoration: none; }
   .toolbar button:disabled { opacity: 0.5; cursor: default; }
   #run {
     background: var(--highlight);
@@ -219,6 +220,12 @@
   }
   #status { min-height: 1.2em; }
 
+  /* show >= and -> exactly as typed (codemirror.css turns ligatures on) */
+  .CodeMirror pre.CodeMirror-line, .CodeMirror pre.CodeMirror-line-like, #output, .answers textarea {
+    font-variant-ligatures: none;
+    font-feature-settings: "liga" 0, "calt" 0;
+  }
+
   @media (max-width: 760px) {
     html, body { height: auto; }
     main { flex: none; grid-template-columns: 1fr; grid-template-rows: 55vh auto; }
@@ -242,6 +249,7 @@
       <option value="">Examples…</option>
     </select>
     <button id="explain" type="button" title="Describe the program in plain English" disabled>Explain</button>
+    <a id="manual" href="manual/" title="Read the SimpleTalk manual">Manual</a>
     <button id="share" type="button" title="Copy a link to this program">Share</button>
     <button id="stop" type="button" hidden>Stop</button>
     <button id="run" type="button" title="Run (Ctrl+Enter)" disabled>Run</button>
@@ -265,7 +273,7 @@
 
 <footer>
   <span id="status">Starting…</span>
-  <span>Runs the real SimpleTalk engine in your browser. In the browser, tasks run one after another. <a href="https://github.com/bicky21/SimpleTalk">SimpleTalk on GitHub</a> · <a href="https://github.com/bicky21/SimpleTalk/blob/master/docs/LANGUAGE.md">Language guide</a></span>
+  <span>Runs the real SimpleTalk engine in your browser. In the browser, tasks run one after another. <a href="https://github.com/bicky21/SimpleTalk">SimpleTalk on GitHub</a> · <a href="manual/">Manual</a></span>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/lib/codemirror.js"></script>
@@ -341,9 +349,10 @@ out scores | only it > 50 | each it * 2 | sort
   });
 
   // ---------------------------------------------------------------- loading code
-  function fromHash() {
-    const m = location.hash.match(/^#code=([A-Za-z0-9_-]*)/);
-    if (!m) return null;
+  // Links look like #code=...&answers=...  (both base64url text; answers is optional)
+  function fromHash(key) {
+    const m = location.hash.slice(1).split("&").map((p) => p.split("=")).find(([k]) => k === key);
+    if (!m || m[1] === undefined) return null;
     try {
       const b64 = m[1].replace(/-/g, "+").replace(/_/g, "/");
       const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -362,8 +371,10 @@ out scores | only it > 50 | each it * 2 | sort
     try { value == null ? localStorage.removeItem(key) : localStorage.setItem(key, value); } catch {}
   }
 
-  editor.setValue(fromHash() ?? saved("simpletalk.code", STARTER));
-  $("answers").value = saved("simpletalk.answers", "");
+  const linkedCode = fromHash("code");
+  editor.setValue(linkedCode ?? saved("simpletalk.code", STARTER));
+  // a shared link brings its own answers (or none), so old answers don't get in the way
+  $("answers").value = linkedCode !== null ? (fromHash("answers") ?? "") : saved("simpletalk.answers", "");
   editor.on("change", () => store("simpletalk.code", editor.getValue()));
   $("answers").addEventListener("input", (e) => store("simpletalk.answers", e.target.value));
 

@@ -4,13 +4,14 @@
 
 <p align="center">
   <a href="https://github.com/bicky21/SimpleTalk/actions/workflows/tests.yml"><img src="https://github.com/bicky21/SimpleTalk/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/version-2.3.1-1C2A52" alt="Version 2.3.1">
+  <img src="https://img.shields.io/badge/version-2.3.2-1C2A52" alt="Version 2.3.2">
   <img src="https://img.shields.io/badge/python-3.10%2B-2F67B1" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/dependencies-none-66728C" alt="No dependencies">
 </p>
 
 <p align="center">
   <a href="https://bicky21.github.io/SimpleTalk/"><b>Try it in your browser</b></a> ·
+  <a href="https://bicky21.github.io/SimpleTalk/manual/"><b>Manual</b></a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#what-makes-simpletalk-different">What's different</a> ·
   <a href="#the-language-in-one-minute">The language</a> ·
@@ -36,6 +37,8 @@ loop i 1..5
 ```
 
 ## Quick start
+
+**Learn it:** the [SimpleTalk Manual](https://bicky21.github.io/SimpleTalk/manual/) goes from your first line to tasks and modules, with a **Try it** button on every example. You can also [read it on GitHub](docs/manual/00-index.md).
 
 **No install:** open the [online playground](https://bicky21.github.io/SimpleTalk/). It runs the real SimpleTalk engine in your browser, with every example, Explain, and shareable links.
 
