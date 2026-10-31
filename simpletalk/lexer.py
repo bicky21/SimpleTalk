@@ -1,34 +1,31 @@
 """Step 1 of running a program: turn text into a list of tokens.
 
 A token is one small "word" of the program, for example:
-    say "Hi {name}"   ->   KEYWORD(say)  TEXT("Hi ", {name})  NEWLINE
+    out "Hi {name}"   ->   KEYWORD(out)  TEXT("Hi ", {name})  NEWLINE
+
+Each token also remembers whether there was a space right before it.
+That is how `area(3, 4)` (a call) differs from `area (3, 4)`.
 """
 
 from dataclasses import dataclass, field
 
 from .errors import SyntaxProblem
 
-# Every reserved word in SimpleTalk. Kept deliberately short so it is
-# easy to remember. Changing this list is a breaking change.
+# Every reserved word in SimpleTalk. All are 2-4 letters long.
+# Changing this list is a breaking change.
 KEYWORDS = {
-    # talking
-    "say", "ask", "into",
-    # variables and lists
-    "set", "to", "change", "by", "add", "remove", "from",
-    # decisions
-    "if", "then", "else", "end",
-    # loops
-    "repeat", "times", "while", "until", "forever", "for", "each", "in",
-    "stop", "skip",
-    # functions
-    "define", "return",
-    # logic and values
-    "and", "or", "not", "is", "mod", "true", "false", "nothing",
+    "let", "up", "out", "in",            # store, add to a number, print, input
+    "add", "del",                        # put into / take out of a list
+    "when", "else",                      # decisions
+    "loop", "while", "stop", "skip",     # loops
+    "fn", "ret",                         # functions
+    "and", "or", "not", "has", "mod",    # operators
+    "true", "false", "none",             # values
 }
 
-# Two-character symbols must be listed before one-character ones.
-SYMBOLS = ["!=", "<=", ">=", "+", "-", "*", "/", "=", "<", ">",
-           "(", ")", "[", "]", ","]
+# Longer symbols must be listed before shorter ones.
+SYMBOLS = ["..", "!=", "<=", ">=", "+", "-", "*", "/", "=", "<", ">",
+           "(", ")", "[", "]", ",", "."]
 
 
 @dataclass
@@ -37,6 +34,7 @@ class Token:
     value: object
     line: int
     column: int
+    spaced: bool = True   # was there a space (or line start) just before it?
 
     def __repr__(self):
         return f"{self.kind}({self.value!r})@{self.line}:{self.column}"
@@ -63,7 +61,8 @@ class Lexer:
         self.line = 1 + line_offset
         self.col = 1 + column_offset
         self.tokens = []
-        self.depth = 0   # how many ( or [ are open; newlines are ignored inside
+        self.depth = 0       # how many ( or [ are open; newlines are ignored inside
+        self.spaced = True   # was the last thing we skipped a space / newline?
 
     # -- small helpers -------------------------------------------------
     def peek(self, ahead=0):
@@ -81,7 +80,8 @@ class Lexer:
         return ch
 
     def add(self, kind, value, line, col):
-        self.tokens.append(Token(kind, value, line, col))
+        self.tokens.append(Token(kind, value, line, col, self.spaced))
+        self.spaced = False
 
     # -- main loop -----------------------------------------------------
     def tokenize(self):
@@ -91,13 +91,17 @@ class Lexer:
 
             if ch in " \t":
                 self.advance()
-            elif ch == "#":
+                self.spaced = True
+            elif ch == ";" and self.peek(1) == ";":
                 while self.peek() and self.peek() != "\n":
                     self.advance()
+                self.spaced = True
             elif ch == "\n":
                 self.advance()
+                self.spaced = True
                 if self.depth == 0 and self.tokens and self.tokens[-1].kind != "NEWLINE":
                     self.add("NEWLINE", "\n", line, col)
+                    self.spaced = True
             elif ch.isdigit() or (ch == "." and self.peek(1).isdigit()):
                 self.read_number(line, col)
             elif ch in "\"'":
@@ -136,10 +140,9 @@ class Lexer:
         word = ""
         while self.peek().isalnum() or self.peek() == "_":
             word += self.advance()
-        lower = word.lower()
-        if lower in KEYWORDS:
-            # Keywords are case-insensitive: SAY, Say and say all work.
-            self.add("KEYWORD", lower, line, col)
+        # Keywords are always lowercase; `Out` or `LET` are just names.
+        if word in KEYWORDS:
+            self.add("KEYWORD", word, line, col)
         else:
             self.add("NAME", word, line, col)
 
@@ -156,10 +159,16 @@ class Lexer:
                 return
         ch = self.peek()
         hint = None
-        if ch == "{" or ch == "}":
+        if ch in "{}":
             hint = "Curly braces { } are only used inside text, like \"Hi {name}\"."
         elif ch == "%":
             hint = "Use the word 'mod' for remainders, like: 10 mod 3"
+        elif ch == "#":
+            hint = "Comments start with ;;  like this:  ;; my note"
+        elif ch == ";":
+            hint = "Comments start with two semicolons: ;;"
+        elif ch == ":":
+            hint = "SimpleTalk doesn't use ':'. A block ends with a line holding just a dot: ."
         elif ch in "“”‘’":
             hint = "That looks like a 'smart quote'. Use plain \" quotes instead."
         raise SyntaxProblem(f"I don't know what the symbol '{ch}' means.", line, col, hint)

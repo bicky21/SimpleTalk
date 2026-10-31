@@ -1,4 +1,4 @@
-"""Tests that lock in how SimpleTalk behaves, so it stays stable."""
+"""Tests that lock in how SimpleTalk 2.0 behaves, so it stays stable."""
 
 import pathlib
 
@@ -6,6 +6,7 @@ import pytest
 
 from simpletalk import RuntimeProblem, SyntaxProblem, run
 from simpletalk.cli import main
+from simpletalk.lexer import KEYWORDS
 
 EXAMPLES = pathlib.Path(__file__).parent.parent / "examples"
 
@@ -23,209 +24,249 @@ def problem(source, kind=SyntaxProblem):
     return info.value
 
 
+def test_every_keyword_is_tiny():
+    assert all(2 <= len(word) <= 5 for word in KEYWORDS)
+
+
 # ---------------------------------------------------------------- basics
-def test_say_text_and_many_values():
-    assert out('say "Hello, World!"') == ["Hello, World!"]
-    assert out('say "a", 1, true, nothing, [1, "x"]') == ['a 1 true nothing [1, "x"]']
+def test_out_text_and_many_values():
+    assert out('out "Hello, World!"') == ["Hello, World!"]
+    assert out('out "a", 1, true, none, [1, "x"]') == ['a 1 true none [1, "x"]']
+    assert out("out") == [""]
 
 
-def test_empty_lines_comments_and_case_insensitive_keywords():
-    assert out('\n\n# comment\nSAY "hi"   # trailing\n\n') == ["hi"]
+def test_empty_lines_and_comments():
+    assert out('\n\n;; comment\nout "hi"   ;; trailing\n\n') == ["hi"]
 
 
 def test_text_interpolation_and_escapes():
-    assert out('set n to 3\nsay "n={n}, double={n * 2}"') == ["n=3, double=6"]
-    assert out('say "{{x}} \\"q\\""') == ['{x} "q"']
-    assert out("say 'single quotes work'") == ["single quotes work"]
+    assert out('let n 3\nout "n={n}, double={n * 2}"') == ["n=3, double=6"]
+    assert out('out "{{x}} \\"q\\""') == ['{x} "q"']
+    assert out("out 'single quotes work'") == ["single quotes work"]
 
 
 def test_numbers_look_friendly():
-    assert out("say 7 / 2, 6 / 3, 0.1 + 0.2, 10 mod 3, -2 * 3") == ["3.5 2 0.3 1 -6"]
-    assert out("say 1_000_000") == ["1000000"]
+    assert out("out 7 / 2, 6 / 3, 0.1 + 0.2, 10 mod 3, -2 * 3") == ["3.5 2 0.3 1 -6"]
+    assert out("out 1_000_000") == ["1000000"]
 
 
 def test_text_plus_anything_joins():
-    assert out('say "Age: " + 12') == ["Age: 12"]
+    assert out('out "Age: " + 12') == ["Age: 12"]
 
 
-def test_set_change_and_ask_converts_numbers():
-    assert out("set x to 5\nchange x by -2\nsay x") == ["3"]
-    assert out('ask "Age?" into a\nsay a + 1', ["41"]) == ["42"]
-    assert out('ask "Name?" into n\nsay type(n)', ["Bicky"]) == ["text"]
+def test_let_up_and_in():
+    assert out("let x 5\nup x\nup x -3\nout x") == ["3"]
+    assert out("let x 1\nlet x x + 1\nout x") == ["2"]
+    assert out('in a "Age?"\nout a + 1', ["41"]) == ["42"]
+    assert out("in n\nout type(n)", ["Bicky"]) == ["text"]
+
+
+def test_negative_values_after_names():
+    assert out("let x -5\nout x") == ["-5"]
+    assert out("let a 10\nlet b a - 3\nout b") == ["7"]
 
 
 # ---------------------------------------------------------------- decisions
-def test_if_else_if_else():
+def test_when_else_when_else():
     src = """
-set x to {}
-if x > 10 then
-    say "big"
-else if x > 5
-    say "medium"
+let x {}
+when x > 10
+    out "big"
+else when x > 5
+    out "medium"
 else
-    say "small"
-end if
+    out "small"
+.
 """
     assert out(src.format(20)) == ["big"]
     assert out(src.format(7)) == ["medium"]
     assert out(src.format(1)) == ["small"]
 
 
-def test_is_and_is_not_and_logic():
-    assert out('say 1 is 1, 1 is not 2, "a" = "a", not false, true and false, true or false') == \
+def test_comparisons_and_logic():
+    assert out('out 1 = 1, 1 != 2, "a" = "a", not false, true and false, true or false') == \
         ["true true true true false true"]
-    assert out("say 1 = 1.0, 1 = \"1\", 1 = true") == ["true false false"]
-
-
-def test_short_circuit_logic():
-    assert out("say false and (1 / 0 = 1)") == ["false"]
+    assert out('out 1 = 1.0, 1 = "1", 1 = true') == ["true false false"]
+    assert out("out false and (1 / 0 = 1)") == ["false"]      # short-circuit
 
 
 # ---------------------------------------------------------------- loops
-def test_repeat_times_runs_exactly_n_times():
-    assert out('repeat 3 times\n say "x"\nend repeat') == ["x"] * 3
-    assert out('repeat 0 times\n say "x"\nend repeat') == []          # old bug: printed once
+def test_loop_count_runs_exactly_n_times():
+    assert out('loop 3\n out "x"\n.') == ["x"] * 3
+    assert out('loop 0\n out "x"\n.') == []
+    assert out("let n 2\nloop n\n out 1\n.") == ["1", "1"]
+    assert out("let n 2\nloop n * 2\n out 1\n.") == ["1"] * 4
 
 
-def test_nested_repeat():
-    assert out('repeat 2 times\n repeat 3 times\n  say "x"\n end\nend') == ["x"] * 6
+def test_nested_loops():
+    assert out('loop 2\n loop 3\n  out "x"\n .\n.') == ["x"] * 6
 
 
-def test_repeat_while_until_forever_stop_skip():
-    assert out("set i to 0\nrepeat while i < 3\n change i by 1\nend\nsay i") == ["3"]
-    assert out("set i to 0\nrepeat until i = 4\n change i by 1\nend\nsay i") == ["4"]
+def test_loop_ranges_count_up_and_down():
+    assert out("loop i 1..3\n out i\n.") == ["1", "2", "3"]
+    assert out("loop i 3..1\n out i\n.") == ["3", "2", "1"]
+    assert out("loop i -1..1\n out i\n.") == ["-1", "0", "1"]
+    assert out("let n 3\nloop i 1..n + 1\n out i\n.") == ["1", "2", "3", "4"]
+    assert out("loop i 1..10000000\n stop\n.") == []                # lazy, no huge list
+    assert out("out 1..4") == ["[1, 2, 3, 4]"]
+
+
+def test_loop_list_and_text():
+    assert out('loop x [1, "b"]\n out x\n.') == ["1", "b"]
+    assert out('loop c "hi"\n out c\n.') == ["h", "i"]
+    assert out("let l [7, 8]\nloop x l\n out x\n.") == ["7", "8"]
+
+
+def test_loop_while_forever_stop_skip():
+    assert out("let i 0\nloop while i < 3\n up i\n.\nout i") == ["3"]
     src = """
-set i to 0
-repeat forever
-    change i by 1
-    if i = 2
+let i 0
+loop
+    up i
+    when i = 2
         skip
-    end if
-    if i > 4
+    .
+    when i > 4
         stop
-    end if
-    say i
-end repeat
+    .
+    out i
+.
 """
     assert out(src) == ["1", "3", "4"]
 
 
-def test_for_range_counts_up_and_down():
-    assert out("for i from 1 to 3\n say i\nend for") == ["1", "2", "3"]
-    assert out("for i from 3 to 1\n say i\nend") == ["3", "2", "1"]
-
-
-def test_for_each_list_and_text():
-    assert out('for each x in [1, "b"]\n say x\nend') == ["1", "b"]
-    assert out('for each c in "hi"\n say c\nend') == ["h", "i"]
-
-
 def test_changing_list_while_looping_is_safe():
-    assert out("set l to [1, 2]\nfor each x in l\n add x to l\nend\nsay l") == ["[1, 2, 1, 2]"]
+    assert out("let l [1, 2]\nloop x l\n add l x\n.\nout l") == ["[1, 2, 1, 2]"]
 
 
 # ---------------------------------------------------------------- lists
 def test_lists_are_one_based_with_negative_from_end():
-    assert out("set l to [10, 20, 30]\nsay l[1], l[-1], length(l)") == ["10 30 3"]
-    assert out("set l to [1, 2]\nset l[2] to 9\nadd 3 to l\nremove 1 from l\nsay l") == ["[9, 3]"]
-    assert out('say "b" in ["a", "b"], "ell" in "hello"') == ["true true"]
+    assert out("let l [10, 20, 30]\nout l[1], l[-1], len(l)") == ["10 30 3"]
+    assert out("let l [1, 2]\nlet l[2] 9\nadd l 3\ndel l 1\nout l") == ["[9, 3]"]
+    assert out('out ["a", "b"] has "b", "hello" has "ell"') == ["true true"]
+
+
+def test_space_decides_call_or_value():
+    # `let x [1, 2]` is a list, `x[1]` is a position
+    assert out("let x [1, 2]\nout x[1]") == ["1"]
 
 
 # ---------------------------------------------------------------- functions
-def test_functions_return_and_recursion():
+def test_functions_ret_and_recursion():
     src = """
-define fact(n)
-    if n <= 1
-        return 1
-    end if
-    return n * fact(n - 1)
-end define
-say fact(10)
+fn fact n
+    when n <= 1
+        ret 1
+    .
+    ret n * fact(n - 1)
+.
+out fact(10)
 """
     assert out(src) == ["3628800"]
 
 
-def test_function_without_return_gives_nothing():
-    assert out("define f()\n set a to 1\nend\nsay f()") == ["nothing"]
+def test_function_without_inputs_or_ret():
+    assert out('fn hi\n out "hi"\n.\nhi()\nout hi()') == ["hi", "hi", "none"]
 
 
-def test_functions_update_globals_but_params_are_local():
+def test_functions_update_globals_but_inputs_are_local():
     src = """
-set score to 0
-define win(score_add)
-    change score by score_add
-    set temp to 1
-end define
+let score 0
+fn win points
+    up score points
+    let temp 1
+.
 win(5)
-say score
+out score
 """
     assert out(src) == ["5"]
     with pytest.raises(RuntimeProblem):
-        out(src + "say temp")
+        out(src + "out temp")
 
 
 def test_closures():
     src = """
-define make()
-    set count to 0
-    define inc()
-        change count by 1
-        return count
-    end
-    return inc
-end
-set counter to make()
+fn make
+    let count 0
+    fn inc
+        up count
+        ret count
+    .
+    ret inc
+.
+let counter make()
 counter()
-say counter()
+out counter()
 """
     assert out(src) == ["2"]
 
 
 def test_builtins():
-    assert out('say upper("hi"), round(2.5), round(3.14159, 2), sqrt(16), power(2, 10)') == \
+    assert out('out upper("hi"), round(2.5), round(3.14159, 2), sqrt(16), pow(2, 10)') == \
         ["HI 3 3.14 4 1024"]
-    assert out('say split("a,b", ","), join(["a", "b"], "-"), reverse("abc"), number("4.0")') == \
-        ['["a", "b"] a-b cba 4']
-    assert out("set r to random(1, 6)\nsay r >= 1 and r <= 6") == ["true"]
+    assert out('out split("a,b", ","), join(["a", "b"], "-"), rev("abc"), num("4.0"), txt(5)') == \
+        ['["a", "b"] a-b cba 4 5']
+    assert out("let r rand(1, 6)\nout r >= 1 and r <= 6") == ["true"]
+    assert out('out type(1), type("a"), type(true), type([]), type(none), type(len)') == \
+        ["number text bool list none fn"]
 
 
 # ---------------------------------------------------------------- friendly errors
 @pytest.mark.parametrize("source, words", [
-    ("x = 5", "set x to"),
-    ('say "hi', "never closed"),
-    ("repeat 3 times\nsay 1", "never closed"),
-    ("end", "nothing to close"),
-    ("stop", "inside a loop"),
-    ("return 1", "inside a 'define'"),
-    ("say 1 < 2 < 3", "two things at a time"),
-    ("if true then say 1", "next line"),
-    ("set to to 1", "SimpleTalk word"),
-    ("say 5 % 2", "mod"),
-    ("repeat 2 times\nsay 1\nend if", "end repeat"),
-    ("say", "needs something"),
+    ('say "hi"', "'out'"),
+    ('print "hi"', "'out'"),
+    ("set x to 5", "'let'"),
+    ("x = 5", "let x 5"),
+    ("if x > 1", "'when'"),
+    ("repeat 3", "'loop'"),
+    ("when true\n out 1\nend", "just a dot"),
+    ('out "hi', "never closed"),
+    ("loop 3\nout 1", "never closed"),
+    (".", "no block to close"),
+    ("stop", "inside a 'loop'"),
+    ("ret 1", "inside an 'fn'"),
+    ("out 1 < 2 < 3", "two things at a time"),
+    ("when true out 1", "next line"),
+    ("let loop 1", "SimpleTalk word"),
+    ("out 5 % 2", "mod"),
+    ("# note", ";;"),
+    ("let x", "needs a value"),
+    ("out", None),
     ("score", "doesn't tell me to do anything"),
+    ("fn f(a)\n.", "without brackets"),
+    ("fn f a, b\n.", "spaces, not commas"),
+    ("let l [1]\nout l [1]", "Remove the space"),
+    ("when true\n out 1\n. out", "alone on its line"),
 ])
 def test_syntax_errors_are_friendly(source, words):
+    if words is None:
+        out(source)           # valid program, nothing to check
+        return
     err = problem(source, SyntaxProblem)
     assert words in str(err) or words in (err.hint or "")
     assert err.line is not None
 
 
 @pytest.mark.parametrize("source, words", [
-    ("say nmae", "I don't know what 'nmae' is"),
-    ('print("hi")', "use 'say'"),
-    ("say [1][0]", "start at 1"),
-    ("say [1][5]", "outside the list"),
-    ("say 1 / 0", "divide by zero"),
-    ('say "a" - 1', "number(...)"),
-    ("if 5\n say 1\nend", "true or false"),
-    ("set x to 1\nadd 2 to x", "change x by 2"),
-    ("set l to [1]\nremove 9 from l", "not in the list"),
-    ("define f(a)\n return a\nend\nsay f(1, 2)", "needs 1 value"),
-    ("define f()\n return f()\nend\nsay f()", "calling itself"),
-    ('say length(5)', "text or lists"),
-    ('say 1 < "a"', "can't compare"),
-    ("change y by 1", "doesn't exist yet"),
+    ("out nmae", "I don't know what 'nmae' is"),
+    ("let name 1\nout nmae", "Did you mean 'name'"),
+    ("out length([1])", "use 'len'"),
+    ("out area(3)", "fn area"),
+    ("out [1][0]", "start at 1"),
+    ("out [1][5]", "outside the list"),
+    ("out 1 / 0", "divide by zero"),
+    ('out "a" - 1', "num(...)"),
+    ("when 5\n out 1\n.", "true or false"),
+    ("let x 1\nadd x 2", "up x 2"),
+    ("let l [1]\ndel l 9", "not in the list"),
+    ("fn f a\n ret a\n.\nout f(1, 2)", "needs 1 value"),
+    ("fn f\n ret f()\n.\nout f()", "calling itself"),
+    ("out len(5)", "text or lists"),
+    ('out 1 < "a"', "can't compare"),
+    ("up y", "doesn't exist yet"),
+    ("loop [1, 2]\n.", "loop item my_list"),
+    ("out 1..100000000", "too big"),
+    ('out 5 has 1', "'has' needs"),
 ])
 def test_runtime_errors_are_friendly(source, words):
     err = problem(source, RuntimeProblem)
@@ -234,14 +275,15 @@ def test_runtime_errors_are_friendly(source, words):
 
 
 def test_error_points_at_the_right_line():
-    err = problem('say "ok"\n\nsay oops', RuntimeProblem)
+    src = 'out "ok"\n\nout oops'
+    err = problem(src, RuntimeProblem)
     assert err.line == 3
-    text = err.pretty('say "ok"\n\nsay oops')
-    assert "3 | say oops" in text and "^" in text
+    text = err.pretty(src)
+    assert "3 | out oops" in text and "^" in text
 
 
 def test_windows_line_endings():
-    assert out('say "a"\r\nsay "b"\r\n') == ["a", "b"]
+    assert out('out "a"\r\nout "b"\r\n') == ["a", "b"]
 
 
 # ---------------------------------------------------------------- examples and CLI
@@ -251,9 +293,22 @@ def test_examples_run(path, capsys):
     assert "Oops" not in capsys.readouterr().err
 
 
+def test_guessing_game(capsys, monkeypatch):
+    import random
+    random.seed(0)
+    secret = random.randint(1, 20)
+    random.seed(0)
+    answers = iter(["abc", "25", str(secret)])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
+    assert main([str(EXAMPLES / "07_guess_the_number.simp")]) == 0
+    printed = capsys.readouterr().out
+    assert "Please type a number" in printed and "Stay between" in printed
+    assert "Correct! You got it in 1 tries." in printed
+
+
 def test_cli_missing_file_and_check(tmp_path, capsys):
     assert main([str(tmp_path / "nope.simp")]) == 2
     bad = tmp_path / "bad.simp"
-    bad.write_text("say nmae\nset x to\n")
+    bad.write_text("out nmae\nlet x\n")
     assert main(["--check", str(bad)]) == 1
     assert "line 2" in capsys.readouterr().err

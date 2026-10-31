@@ -1,222 +1,248 @@
-# The SimpleTalk Language Guide (version 1.0)
+# The SimpleTalk Language Guide (version 2.0)
 
 SimpleTalk is designed around three rules:
 
-1. **Read like English.** `set score to 10`, `repeat 3 times`, `add "milk" to shopping`.
-2. **One way to do each thing.** Fewer things to remember.
+1. **Type less.** Every keyword is 2–5 letters: `let`, `out`, `when`, `loop`, `fn`.
+2. **One way to do each thing.** Only **22 keywords** and **23 built-in functions** — this page lists all of them.
 3. **Never crash with a scary error.** Every mistake gets a line number, a `^` marker and a hint.
-
-There are only **34 keywords** and **23 built-in functions**. This page lists all of them.
 
 ---
 
-## 1. The basics
+## 1. The whole language on one card
 
 ```
-# Anything after a hash is a comment.
-say "Hello!"                # show something
-say "Total:", 5 + 5         # commas separate values (printed with a space)
+;; comment
+let name "Bicky"          ;; store a value
+out "Hi {name}"           ;; show it
+in age "Your age?"        ;; ask the user
+up age                    ;; add 1   (up age 5 adds 5, up age -1 takes 1 away)
+
+when age >= 18            ;; decide
+    out "adult"
+else when age >= 13
+    out "teen"
+else
+    out "kid"
+.                         ;; a dot closes the block
+
+loop 3                    ;; 3 times
+    out "hi"
+.
+loop i 1..5               ;; count 1 to 5
+    out i
+.
+loop f ["apple", "kiwi"]  ;; every item of a list
+    out f
+.
+loop while age < 21       ;; while something is true
+    up age
+.
+loop                      ;; forever — leave with stop
+    stop
+.
+
+fn area w h               ;; your own function
+    ret w * h
+.
+out area(3, 4)
 ```
 
-- One instruction per line. Indentation is optional (but makes code easier to read).
-- Keywords are not case-sensitive: `say`, `Say` and `SAY` all work.
-- Names are case-sensitive: `score` and `Score` are different variables.
+## 2. Two layout rules
 
-## 2. Values
+1. **One instruction per line.** Indentation is optional, but it makes code easier to read.
+2. **A block ends with a line holding just a dot (`.`).** `when`, `loop` and `fn` all start blocks.
 
-| Kind      | Examples                    | Notes                                      |
-|-----------|-----------------------------|--------------------------------------------|
-| number    | `42`, `3.5`, `-7`, `1_000`  | `7 / 2` is `3.5`, `6 / 3` is `2`            |
-| text      | `"hello"`, `'hi'`           | `{name}` inside text inserts a value       |
-| boolean   | `true`, `false`             | the answer to a question like `x > 3`      |
-| list      | `[1, 2, 3]`, `[]`           | positions start at **1**                   |
-| nothing   | `nothing`                   | "no value"                                 |
-| function  | `define ...`, `length`      | something you can call with `( )`          |
+And one spacing rule:
+
+> **No space before `(` or `[` when calling or picking an item.**
+> `area(3, 4)` calls a function and `fruits[1]` picks an item.
+> With a space, `[1, 2]` and `(3 + 4)` are just values.
+
+Keywords are lowercase. Names are case-sensitive: `score` and `Score` are different.
+
+## 3. Values
+
+| Kind   | Examples                    | Notes                                       |
+|--------|-----------------------------|---------------------------------------------|
+| number | `42`, `3.5`, `-7`, `1_000`  | `7 / 2` is `3.5`, `6 / 3` is `2`             |
+| text   | `"hello"`, `'hi'`           | `{name}` inside text inserts a value        |
+| bool   | `true`, `false`             | the answer to a question like `x > 3`       |
+| list   | `[1, 2, 3]`, `[]`, `1..5`   | positions start at **1**                    |
+| none   | `none`                      | "no value"                                  |
+| fn     | `fn ...`, `len`             | something you can call with `( )`           |
 
 ### Text tricks
 ```
-set name to "Bicky"
-say "Hi {name}, 2 + 2 is {2 + 2}"     # Hi Bicky, 2 + 2 is 4
-say "Use {{ and }} for real braces"   # Use { and } for real braces
-say "Line one\nLine two"              # \n = new line, \t = tab, \" = quote
-say "Age: " + 12                      # text + anything = joined text
+out "Hi {name}, 2 + 2 is {2 + 2}"   ;; Hi Bicky, 2 + 2 is 4
+out "Use {{ and }} for real braces" ;; Use { and } for real braces
+out "Line one\nLine two"            ;; \n new line, \t tab, \" quote
+out "Age: " + 12                    ;; text + anything = joined text
 ```
 
-## 3. Variables
+## 4. Storing and changing values
 
 ```
-set age to 20          # create or replace
-change age by 1        # add to a number (use a negative number to subtract)
-ask "Your name?" into name   # ask the user; typed numbers become real numbers
+let score 10            ;; create or replace
+let score score * 2     ;; use the old value to make a new one
+up score                ;; add 1
+up score 5              ;; add 5
+up score -5             ;; take 5 away
+in name "Your name?"    ;; ask; a typed number becomes a real number
+in answer               ;; ask without a question
 ```
 
-## 4. Maths and comparisons
+## 5. Maths and comparisons
 
-| Write            | Meaning                         |
-|------------------|---------------------------------|
-| `+ - * /`        | add, subtract, multiply, divide |
-| `mod`            | remainder: `10 mod 3` is `1`    |
-| `=` or `is`      | equal                           |
-| `!=` or `is not` | not equal                       |
-| `< > <= >=`      | less / greater                  |
-| `in`             | `"a" in my_list`, `"ell" in "hello"` |
-| `and or not`     | combine true/false answers      |
+| Write         | Meaning                                    |
+|---------------|--------------------------------------------|
+| `+ - * /`     | add, subtract, multiply, divide            |
+| `mod`         | remainder: `10 mod 3` is `1`               |
+| `=`  `!=`     | equal, not equal                           |
+| `< > <= >=`   | less / greater                             |
+| `has`         | `fruits has "kiwi"`, `"hello" has "ell"`   |
+| `and or not`  | combine true/false answers                 |
+| `a..b`        | a range: `1..5` is `[1, 2, 3, 4, 5]`, `5..1` counts down |
 
-Order: brackets, then `- (negative)`, then `* / mod`, then `+ -`, then comparisons, then `not`, `and`, `or`.
+Order: brackets, `-` (negative), `* / mod`, `+ -`, `..`, comparisons, `not`, `and`, `or`.
 
-Only compare two things at once: write `x > 1 and x < 10`, not `1 < x < 10`.
+Compare two things at a time: write `x > 1 and x < 10`, not `1 < x < 10`.
 
-## 5. Decisions
+## 6. Decisions
 
 ```
-if marks >= 90 then
-    say "A"
-else if marks >= 70 then
-    say "B"
+when marks >= 90
+    out "A"
+else when marks >= 70
+    out "B"
 else
-    say "Keep going!"
-end if
+    out "Keep going!"
+.
 ```
 
-- `then` is optional.
-- The condition must be `true` or `false` (SimpleTalk won't guess what `if 5` means).
-- Close every block with `end`. You may write `end if`, `end repeat`, `end for` or `end define` to be extra clear — if you do, SimpleTalk checks that it matches.
+One dot closes the whole `when` / `else when` / `else` chain.
+The check must be `true` or `false` — SimpleTalk won't guess what `when 5` means.
 
-## 6. Loops
+## 7. Loops
 
-```
-repeat 3 times              # a fixed number of times
-    say "hi"
-end repeat
+| Write                 | Does                                         |
+|-----------------------|----------------------------------------------|
+| `loop 3`              | 3 times (any number or value: `loop n * 2`)  |
+| `loop i 1..10`        | counts; `10..1` counts down                  |
+| `loop x my_list`      | every item of a list (or letter of a text)   |
+| `loop while x < 10`   | while something is true                      |
+| `loop`                | forever, until `stop`                        |
 
-repeat while x < 10         # while something is true
-    change x by 1
-end repeat
+Inside any loop, `stop` leaves the loop and `skip` jumps to the next round.
 
-repeat until x = 0          # until something becomes true
-    change x by -1
-end repeat
+How SimpleTalk tells `loop 3` from `loop i 1..10`: if a name is followed by a value, it's the loop's name.
 
-repeat forever              # until you 'stop'
-    ...
-end repeat
-
-for i from 1 to 10          # counting (both ends included)
-    say i
-end for
-
-for i from 10 to 1          # counts down automatically
-    say i
-end for
-
-for each fruit in fruits    # every item of a list (or letter of a text)
-    say fruit
-end for
-```
-
-Inside any loop:
-- `stop` leaves the loop now.
-- `skip` jumps to the next round.
-
-## 7. Lists
+## 8. Lists
 
 ```
-set shopping to ["milk", "eggs"]
-add "bread" to shopping           # put at the end
-remove "eggs" from shopping       # remove the first match
-set shopping[1] to "oat milk"     # change an item
-say shopping[1]                   # first item
-say shopping[-1]                  # last item
-say length(shopping)              # how many items
-if "bread" in shopping then ...
+let shopping ["milk", "eggs"]
+add shopping "bread"           ;; put at the end
+del shopping "eggs"            ;; remove the first match
+let shopping[1] "oat milk"     ;; change an item
+out shopping[1]                ;; first item
+out shopping[-1]               ;; last item
+out len(shopping)              ;; how many items
+when shopping has "bread"
+    out "yes"
+.
 ```
 
-Positions start at **1** (like counting in real life). `[0]` is an error with a helpful hint.
-Text works the same way: `"hello"[1]` is `"h"`.
+Positions start at **1**. `[0]` is an error with a helpful hint. Text works the same way: `"hello"[1]` is `"h"`.
 
-## 8. Functions
+## 9. Functions
 
 ```
-define greet(name)
-    say "Hello, {name}!"
-end define
+fn greet name
+    out "Hello, {name}!"
+.
 
-define area(width, height)
-    return width * height
-end define
+fn area width height
+    ret width * height
+.
+
+fn hello                 ;; no inputs
+    out "hi"
+.
 
 greet("Bicky")
-say area(3, 4)
+out area(3, 4)
+hello()
 ```
 
-- A function without `return` gives back `nothing`.
-- Parameters (like `name`) belong to the function.
-- `set` inside a function changes an outer variable **if it already exists**; otherwise it makes a new variable that only lives inside the function.
-- Functions can call themselves (recursion) up to 1000 levels deep.
+- Inputs are listed after the name, separated by spaces (no brackets, no commas).
+- A function without `ret` gives back `none`.
+- Inputs belong to the function. `let` inside a function changes an outer variable **if it already exists**; otherwise it makes one that only lives inside the function.
+- Functions can call themselves up to 1000 levels deep.
 
-## 9. Built-in functions
+## 10. Built-in functions
 
 | Function                | Example                                 |
 |-------------------------|-----------------------------------------|
-| `length(x)`             | `length("hello")` → `5`                 |
-| `number(x)`             | `number("42")` → `42`                   |
-| `is_number(x)`          | `is_number("4.5")` → `true`             |
-| `text(x)`               | `text(42)` → `"42"`                     |
+| `len(x)`                | `len("hello")` → `5`                    |
+| `num(x)`                | `num("42")` → `42`                      |
+| `isnum(x)`              | `isnum("4.5")` → `true`                 |
+| `txt(x)`                | `txt(42)` → `"42"`                      |
 | `type(x)`               | `type([1])` → `"list"`                  |
 | `round(x, digits)`      | `round(3.14159, 2)` → `3.14` (2.5 → 3)  |
 | `abs(x)`                | `abs(-5)` → `5`                         |
 | `sqrt(x)`               | `sqrt(16)` → `4`                        |
-| `power(x, y)`           | `power(2, 10)` → `1024`                 |
-| `random(low, high)`     | `random(1, 6)` → a whole number 1 to 6  |
+| `pow(x, y)`             | `pow(2, 10)` → `1024`                   |
+| `rand(low, high)`       | `rand(1, 6)` → a whole number 1 to 6    |
 | `min(...)` / `max(...)` | `max(3, 9, 2)` or `max(my_list)`        |
 | `sum(list)`             | `sum([1, 2, 3])` → `6`                  |
 | `upper(t)` / `lower(t)` | `upper("hi")` → `"HI"`                  |
 | `trim(t)`               | `trim("  hi ")` → `"hi"`                |
-| `replace(t, old, new)`  | `replace("cat", "c", "b")` → `"bat"`    |
+| `swap(t, old, new)`     | `swap("cat", "c", "b")` → `"bat"`       |
 | `split(t, sep)`         | `split("a,b", ",")` → `["a", "b"]`      |
 | `join(list, sep)`       | `join(["a", "b"], "-")` → `"a-b"`       |
 | `sort(list)`            | `sort([3, 1, 2])` → `[1, 2, 3]` (new list) |
-| `reverse(x)`            | `reverse("abc")` → `"cba"` (new value)  |
+| `rev(x)`                | `rev("abc")` → `"cba"` (new value)      |
 | `copy(list)`            | a separate copy of a list               |
 | `wait(seconds)`         | `wait(0.5)` pauses half a second        |
 
-## 10. All keywords
+## 11. All 22 keywords
 
 ```
-say ask into
-set to change by add remove from
-if then else end
-repeat times while until forever for each in stop skip
-define return
-and or not is mod true false nothing
+let up out in add del
+when else loop while stop skip fn ret
+and or not has mod true false none
 ```
 
 These can't be used as variable names.
 
-## 11. Coming from Python?
+## 12. Coming from Python (or SimpleTalk 1.0)?
 
-| Python                    | SimpleTalk                        |
-|---------------------------|-----------------------------------|
-| `print(x)`                | `say x`                           |
-| `x = 5`                   | `set x to 5`                      |
-| `x += 1`                  | `change x by 1`                   |
-| `name = input("Name? ")`  | `ask "Name?" into name`           |
-| `elif`                    | `else if`                         |
-| `for i in range(1, 11):`  | `for i from 1 to 10`              |
-| `while x < 5:`            | `repeat while x < 5`              |
-| `break` / `continue`      | `stop` / `skip`                   |
-| `def f(a):`               | `define f(a)`                     |
-| `lst.append(x)`           | `add x to lst`                    |
-| `len(x)`                  | `length(x)`                       |
-| `lst[0]`                  | `lst[1]`                          |
-| `x % 2`                   | `x mod 2`                         |
-| `True / False / None`     | `true / false / nothing`          |
+| Python                    | SimpleTalk 1.0            | SimpleTalk 2.0        |
+|---------------------------|---------------------------|-----------------------|
+| `print(x)`                | `say x`                   | `out x`               |
+| `x = 5`                   | `set x to 5`              | `let x 5`             |
+| `x += 1`                  | `change x by 1`           | `up x`                |
+| `name = input("Name? ")`  | `ask "Name?" into name`   | `in name "Name?"`     |
+| `if` / `elif` / `else`    | `if` / `else if` / `else` | `when` / `else when` / `else` |
+| (indentation)             | `end if`                  | `.`                   |
+| `for i in range(1, 11):`  | `for i from 1 to 10`      | `loop i 1..10`        |
+| `for x in items:`         | `for each x in items`     | `loop x items`        |
+| `while x < 5:`            | `repeat while x < 5`      | `loop while x < 5`    |
+| `break` / `continue`      | `stop` / `skip`           | `stop` / `skip`       |
+| `def f(a, b):`            | `define f(a, b)`          | `fn f a b`            |
+| `return x`                | `return x`                | `ret x`               |
+| `items.append(x)`         | `add x to items`          | `add items x`         |
+| `items.remove(x)`         | `remove x from items`     | `del items x`         |
+| `x in items`              | `x in items`              | `items has x`         |
+| `len(x)`                  | `length(x)`               | `len(x)`              |
+| `items[0]`                | `items[1]`                | `items[1]`            |
+| `# comment`               | `# comment`               | `;; comment`          |
+| `None`                    | `nothing`                 | `none`                |
 
-If you type the Python word by mistake, SimpleTalk tells you the right one.
+If you type a word from another language by mistake, SimpleTalk tells you the right one.
 
-## 12. Stability promise
+## 13. Stability promise
 
-From version 1.0, programs that work keep working:
-- Keywords and built-in names won't be renamed or removed in any 1.x release.
-- New features may be **added** in 1.x (new built-ins, for example).
-- Anything that would break existing programs waits for version 2.0 and is listed in `CHANGELOG.md`.
+From version 2.0, programs that work keep working:
+- Keywords and built-in names won't be renamed or removed in any 2.x release.
+- New features may be **added** in 2.x (new built-ins, for example).
+- Anything that would break existing programs waits for version 3.0 and is listed in `CHANGELOG.md`.

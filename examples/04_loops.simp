@@ -1,27 +1,27 @@
-# Loops: repeat, repeat while, for ... from ... to, for each
-repeat 3 times
-    say "Hip hip hooray!"
-end repeat
+;; Loops: a count, a range, a list, while, and forever
+loop 3
+    out "Hip hip hooray!"
+.
 
-for i from 1 to 5
-    say "{i} x 7 = {i * 7}"
-end for
+loop i 1..5
+    out "{i} x 7 = {i * 7}"
+.
 
-say "Countdown:"
-for i from 3 to 1
-    say i
-end for
-say "Lift off!"
+out "Countdown:"
+loop i 3..1
+    out i
+.
+out "Lift off!"
 
-set n to 1
-repeat while n < 100
-    set n to n * 2
-end repeat
-say "First power of 2 above 100 is", n
+let n 1
+loop while n < 100
+    let n n * 2
+.
+out "First power of 2 above 100 is", n
 
-for each fruit in ["apple", "banana", "cherry"]
-    if fruit is "banana" then
-        skip          # jump to the next fruit
-    end if
-    say "I like", fruit
-end for
+loop fruit ["apple", "banana", "cherry"]
+    when fruit = "banana"
+        skip          ;; jump to the next fruit
+    .
+    out "I like", fruit
+.

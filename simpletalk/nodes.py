@@ -66,7 +66,7 @@ class Say(Node):
 
 @dataclass
 class Ask(Node):
-    prompt: Node
+    prompt: Node | None
     target: str
 
 
@@ -110,7 +110,6 @@ class RepeatTimes(Node):
 class RepeatWhile(Node):
     condition: Node | None   # None means forever
     body: list
-    until: bool = False
 
 
 @dataclass
@@ -119,13 +118,6 @@ class ForEach(Node):
     iterable: Node
     body: list
 
-
-@dataclass
-class ForRange(Node):
-    var: str
-    start: Node
-    end: Node
-    body: list
 
 
 @dataclass

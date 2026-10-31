@@ -3,14 +3,14 @@
 Use it from Python:
 
     from simpletalk import run
-    run('say "Hello!"')
+    run('out "Hello!"')
 """
 
 from .errors import RuntimeProblem, SimpleTalkError, SyntaxProblem
 from .interpreter import Interpreter
 from .parser import parse
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 __all__ = ["run", "parse", "Interpreter", "SimpleTalkError", "SyntaxProblem",
            "RuntimeProblem", "__version__"]
 

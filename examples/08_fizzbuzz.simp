@@ -1,12 +1,12 @@
-# The classic FizzBuzz
-for i from 1 to 15
-    if i mod 15 = 0 then
-        say "FizzBuzz"
-    else if i mod 3 = 0 then
-        say "Fizz"
-    else if i mod 5 = 0 then
-        say "Buzz"
+;; The classic FizzBuzz
+loop i 1..15
+    when i mod 15 = 0
+        out "FizzBuzz"
+    else when i mod 3 = 0
+        out "Fizz"
+    else when i mod 5 = 0
+        out "Buzz"
     else
-        say i
-    end if
-end for
+        out i
+    .
+.

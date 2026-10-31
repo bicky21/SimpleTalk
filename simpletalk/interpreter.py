@@ -12,13 +12,13 @@ MAX_CALL_DEPTH = 1000
 
 # Words people bring from other languages, and what to use instead.
 FRIENDLY_RENAMES = {
-    "print": "say", "echo": "say", "input": "ask ... into ...",
-    "len": "length", "str": "text", "int": "number", "float": "number",
-    "append": "add ... to ...", "push": "add ... to ...", "def": "define",
-    "function": "define", "while": "repeat while", "loop": "repeat",
-    "True": "true", "False": "false", "None": "nothing", "null": "nothing",
-    "elif": "else if", "break": "stop", "continue": "skip",
+    "say": "out", "print": "out", "input": "in name \"prompt\"", "ask": "in name \"prompt\"",
+    "length": "len", "str": "txt", "text": "txt", "int": "num", "float": "num", "number": "num",
+    "random": "rand", "reverse": "rev", "power": "pow", "replace": "swap",
+    "is_number": "isnum", "append": "add list value", "push": "add list value",
+    "True": "true", "False": "false", "None": "none", "nothing": "none", "null": "none", "nil": "none",
 }
+RANGE_LIMIT = 10_000_000
 
 
 class _Stop(Exception):
@@ -99,7 +99,7 @@ class Interpreter:
         self.output(" ".join(show(self.eval(v, scope)) for v in node.values))
 
     def exec_Ask(self, node, scope):
-        prompt = show(self.eval(node.prompt, scope))
+        prompt = "" if node.prompt is None else show(self.eval(node.prompt, scope))
         if prompt and not prompt.endswith(" "):
             prompt += " "
         try:
@@ -121,7 +121,7 @@ class Interpreter:
         self.assign(node.target, value, scope)
 
     def assign(self, name, value, scope):
-        """`set` updates the nearest existing variable, or creates a new one here."""
+        """`let` updates the nearest existing variable, or creates a new one here."""
         target = scope.find(name)
         if target is None or target is self.builtins:
             target = scope
@@ -145,14 +145,14 @@ class Interpreter:
     def exec_Change(self, node, scope):
         owner = scope.find(node.name)
         if owner is None or owner is self.builtins:
-            self.fail(node, f"I can't change '{node.name}' because it doesn't exist yet.",
-                      hint=f"Create it first: set {node.name} to 0")
+            self.fail(node, f"I can't use 'up' on '{node.name}' because it doesn't exist yet.",
+                      hint=f"Create it first: let {node.name} 0")
         current = owner.vars[node.name]
         amount = self.eval(node.amount, scope)
         if not is_number(current):
-            self.fail(node, f"'{node.name}' is {type_name(current)}, so I can't change it by a number.")
+            self.fail(node, f"'{node.name}' is {type_name(current)}, so 'up' can't add a number to it.")
         if not is_number(amount):
-            self.fail(node, f"I can only change '{node.name}' by a number, not {type_name(amount)}.")
+            self.fail(node, f"'up' needs a number to add to '{node.name}', not {type_name(amount)}.")
         owner.vars[node.name] = tidy_number(current + amount)
 
     def exec_Add(self, node, scope):
@@ -161,25 +161,25 @@ class Interpreter:
         if not isinstance(target, list):
             hint = None
             if is_number(target) and isinstance(node.target, N.Name):
-                hint = f"To add to a number, write: change {node.target.name} by {show(value)}"
-            self.fail(node, f"'add ... to' needs a list, but this is {type_name(target)}.", hint)
+                hint = f"To add to a number, write: up {node.target.name} {show(value)}"
+            self.fail(node, f"'add' needs a list, but this is {type_name(target)}.", hint)
         target.append(value)
 
     def exec_Remove(self, node, scope):
         value = self.eval(node.value, scope)
         target = self.eval(node.target, scope)
         if not isinstance(target, list):
-            self.fail(node, f"'remove ... from' needs a list, but this is {type_name(target)}.")
+            self.fail(node, f"'del' needs a list, but this is {type_name(target)}.")
         for i, item in enumerate(target):
             if equal(item, value):
                 del target[i]
                 return
-        self.fail(node, f"{show(value, True)} is not in the list, so I can't remove it.",
-                  hint="Check first with: if ... in my_list")
+        self.fail(node, f"{show(value, True)} is not in the list, so I can't delete it.",
+                  hint="Check first with: when my_list has ...")
 
     def exec_If(self, node, scope):
         for cond, body in node.branches:
-            if self.truth(cond, scope, "if"):
+            if self.truth(cond, scope, "when"):
                 self.exec_block(body, scope)
                 return
         if node.else_body is not None:
@@ -198,9 +198,12 @@ class Interpreter:
     def exec_RepeatTimes(self, node, scope):
         count = self.eval(node.count, scope)
         if not is_number(count) or (isinstance(count, float) and not count.is_integer()):
-            self.fail(node, f"'repeat' needs a whole number of times, not {show(count, True)}.")
+            hint = None
+            if isinstance(count, list):
+                hint = "To go through a list, give the loop a name: loop item my_list"
+            self.fail(node, f"'loop' needs a whole number of times, not {show(count, True)}.", hint)
         if count < 0:
-            self.fail(node, f"I can't repeat something {show(count)} times.")
+            self.fail(node, f"I can't loop {show(count)} times.")
         for _ in range(int(count)):
             if not self.run_loop_body(node.body, scope):
                 break
@@ -208,39 +211,51 @@ class Interpreter:
     def exec_RepeatWhile(self, node, scope):
         while True:
             if node.condition is not None:
-                ok = self.truth(node.condition, scope, "repeat until" if node.until else "repeat while")
-                if ok == node.until:
+                ok = self.truth(node.condition, scope, "loop while")
+                if not ok:
                     break
             if not self.run_loop_body(node.body, scope):
                 break
 
     def exec_ForEach(self, node, scope):
-        items = self.eval(node.iterable, scope)
-        if isinstance(items, str):
-            items = list(items)
-        elif isinstance(items, list):
-            items = list(items)        # loop over a copy, so changing the list is safe
+        it = node.iterable
+        if isinstance(it, N.Binary) and it.op == "..":
+            items = self.range_iter(it, scope)           # counts without building a list
         else:
-            self.fail(node, f"'for each' needs a list or text, but got {type_name(items)}.",
-                      hint="To count, use: for i from 1 to 10")
+            items = self.eval(it, scope)
+            if isinstance(items, (str, list)):
+                items = list(items)    # loop over a copy, so changing the list is safe
+            else:
+                self.fail(node, f"'loop {node.var} ...' needs a list, text or range, but got {type_name(items)}.",
+                          hint=f"To count, use a range: loop {node.var} 1..10")
         for item in items:
             scope.vars[node.var] = item
             if not self.run_loop_body(node.body, scope):
                 break
 
-    def exec_ForRange(self, node, scope):
-        start = self.eval(node.start, scope)
-        end = self.eval(node.end, scope)
+    def range_ends(self, node, scope):
+        start = self.eval(node.left, scope)
+        end = self.eval(node.right, scope)
         for v, which in ((start, "start"), (end, "end")):
             if not is_number(v):
-                self.fail(node, f"The {which} of 'for ... from ... to' must be a number, not {type_name(v)}.")
-        step = 1 if end >= start else -1     # counts down automatically
+                self.fail(node, f"The {which} of a range must be a number, not {type_name(v)}.",
+                          hint="Ranges look like: 1..10")
+        return start, end
+
+    def range_iter(self, node, scope):
+        start, end = self.range_ends(node, scope)
+        step = 1 if end >= start else -1     # 5..1 counts down
         i = start
         while (i <= end) if step > 0 else (i >= end):
-            scope.vars[node.var] = i
-            if not self.run_loop_body(node.body, scope):
-                break
+            yield i
             i = tidy_number(i + step)
+
+    def eval_range(self, node, scope):
+        start, end = self.range_ends(node, scope)
+        if abs(end - start) >= RANGE_LIMIT:
+            self.fail(node, f"That range is too big to turn into a list (over {RANGE_LIMIT:,} items).",
+                      hint="Loop over it directly instead: loop i 1..n")
+        return list(self.range_iter(node, scope))
 
     def exec_Define(self, node, scope):
         scope.vars[node.name] = Function(node.name, node.params, node.body, scope)
@@ -272,7 +287,7 @@ class Interpreter:
         if isinstance(value, bool):
             return value
         self.fail(node, f"'{where}' needs true or false, but got {type_name(value)} {show(value, True)}.",
-                  hint="Compare it with something, like: x > 0  or  name is \"\"")
+                  hint="Compare it with something, like: x > 0  or  name != \"\"")
 
     def eval_Literal(self, node, scope):
         return node.value
@@ -292,7 +307,7 @@ class Interpreter:
             hint = f"In SimpleTalk, use '{FRIENDLY_RENAMES[node.name]}' instead of '{node.name}'."
         else:
             hint = did_you_mean(node.name, scope.all_names()) or \
-                f"Give it a value first, like: set {node.name} to 0"
+                f"Give it a value first, like: let {node.name} 0"
         self.fail(node, f"I don't know what '{node.name}' is.", hint)
 
     def eval_Unary(self, node, scope):
@@ -305,6 +320,8 @@ class Interpreter:
 
     def eval_Binary(self, node, scope):
         op = node.op
+        if op == "..":
+            return self.eval_range(node, scope)
         if op in ("and", "or"):
             left = self.truth(node.left, scope, op)
             if op == "and" and not left:
@@ -320,18 +337,19 @@ class Interpreter:
             return equal(a, b)
         if op == "!=":
             return not equal(a, b)
-        if op == "in":
-            if isinstance(b, list):
-                return any(equal(a, item) for item in b)
-            if isinstance(b, str):
-                if not isinstance(a, str):
-                    self.fail(node, f"To look inside text, the thing to find must be text too, not {type_name(a)}.")
-                return a in b
-            self.fail(node, f"'in' needs a list or text on the right, not {type_name(b)}.")
+        if op == "has":
+            if isinstance(a, list):
+                return any(equal(b, item) for item in a)
+            if isinstance(a, str):
+                if not isinstance(b, str):
+                    self.fail(node, f"To look inside text, the thing to find must be text too, not {type_name(b)}.")
+                return b in a
+            self.fail(node, f"'has' needs a list or text on the left, not {type_name(a)}.",
+                      hint='Like: fruits has "kiwi"   or   "hello" has "ell"')
         if op in ("<", ">", "<=", ">="):
             if not ((is_number(a) and is_number(b)) or (isinstance(a, str) and isinstance(b, str))):
                 self.fail(node, f"I can't compare {type_name(a)} with {type_name(b)} using '{op}'.",
-                          hint="Compare numbers with numbers, or text with text. number(...) can help.")
+                          hint="Compare numbers with numbers, or text with text. num(...) can help.")
             return {"<": a < b, ">": a > b, "<=": a <= b, ">=": a >= b}[op]
 
         if op == "+":
@@ -347,7 +365,7 @@ class Interpreter:
             names = {"-": "subtract", "*": "multiply", "/": "divide", "mod": "use mod with"}
             hint = None
             if isinstance(a, str) or isinstance(b, str):
-                hint = "If the text holds a number, turn it into one with number(...)."
+                hint = "If the text holds a number, turn it into one with num(...)."
             self.fail(node, f"I can only {names[op]} numbers, not {type_name(a)} and {type_name(b)}.", hint)
         try:
             if op == "-":
@@ -391,7 +409,13 @@ class Interpreter:
         return container[self.position(node, container, index)]
 
     def eval_Call(self, node, scope):
-        fn = self.eval(node.callee, scope)
+        callee = node.callee
+        if isinstance(callee, N.Name) and scope.find(callee.name) is None \
+                and callee.name not in FRIENDLY_RENAMES:
+            hint = did_you_mean(callee.name, scope.all_names()) or \
+                f"Make it first with:  fn {callee.name} ...  (and end the block with a '.' line)"
+            self.fail(callee, f"I don't know a function called '{callee.name}'.", hint)
+        fn = self.eval(callee, scope)
         args = [self.eval(a, scope) for a in node.args]
         name = node.callee.name if isinstance(node.callee, N.Name) else "this function"
 
@@ -408,7 +432,8 @@ class Interpreter:
                 raise
 
         if not isinstance(fn, Function):
-            self.fail(node, f"'{name}' is {type_name(fn)}, not a function, so it can't be called with ( ).")
+            self.fail(node, f"'{name}' is {type_name(fn)}, not a function, so it can't be called with ( ).",
+                      hint="To get an item from a list, use [ ], like: my_list[1]")
 
         if len(args) != len(fn.params):
             params = ", ".join(fn.params)
@@ -417,7 +442,7 @@ class Interpreter:
 
         if self.depth >= MAX_CALL_DEPTH:
             self.fail(node, f"Too many functions calling each other (more than {MAX_CALL_DEPTH} deep).",
-                      hint=f"Does '{fn.name}' keep calling itself forever? Make sure it has a way to stop.")
+                      hint=f"Does '{fn.name}' keep calling itself forever? Make sure it can 'ret' without calling itself.")
         local = Scope(fn.closure)
         local.vars.update(zip(fn.params, args))
         self.depth += 1

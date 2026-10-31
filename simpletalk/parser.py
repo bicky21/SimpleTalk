@@ -1,15 +1,39 @@
 """Step 2: turn the list of tokens into a tree of nodes (the program's structure).
 
-The grammar is small on purpose. Every block starts with a keyword and is
-closed with `end` (you may write `end if`, `end repeat`, ... to be extra clear).
+SimpleTalk 2.0 grammar, in one screen:
+
+    let NAME VALUE            let NAME[POS] VALUE
+    up NAME [AMOUNT]          out [VALUE, VALUE, ...]
+    in NAME [PROMPT]          add LIST VALUE        del LIST VALUE
+    when COND ... (else when COND ...)* (else ...)? .
+    loop ... .                loop N ... .          loop while COND ... .
+    loop NAME LIST_OR_RANGE ... .
+    fn NAME PARAM PARAM ... .                       ret [VALUE]
+    stop                      skip                  NAME(ARGS)
+
+A block is closed by a line holding just a dot.
+Rule for calls and positions: no space before ( or [  ->  area(3, 4)  list[1]
 """
 
 from . import nodes as N
 from .errors import SyntaxProblem
 from .lexer import TextPart, TextValue, tokenize
 
-BLOCK_WORDS = {"if", "repeat", "for", "define"}
 COMPARE_OPS = {"=", "!=", "<", ">", "<=", ">="}
+
+# Words people bring from other languages (or SimpleTalk 1.0) -> 2.0 word.
+OLD_WORDS = {
+    "say": "out", "print": "out", "echo": "out", "puts": "out", "console": "out",
+    "set": "let", "var": "let", "const": "let",
+    "ask": "in", "input": "in",
+    "change": "up",
+    "if": "when", "elif": "else when", "then": None,
+    "repeat": "loop", "for": "loop", "forever": "loop", "do": "loop",
+    "define": "fn", "def": "fn", "function": "fn", "func": "fn",
+    "return": "ret", "break": "stop", "continue": "skip",
+    "remove": "del", "append": "add", "push": "add",
+    "end": ".", "endif": ".", "done": ".",
+}
 
 
 class Parser:
@@ -35,6 +59,9 @@ class Parser:
     def at_kw(self, *words):
         return self.tok.kind == "KEYWORD" and self.tok.value in words
 
+    def at_line_end(self):
+        return self.at("NEWLINE") or self.at("EOF")
+
     def next(self):
         tok = self.tok
         if tok.kind != "EOF":
@@ -54,12 +81,6 @@ class Parser:
         tok = tok or self.tok
         raise SyntaxProblem(message, tok.line, tok.column, hint)
 
-    def expect_kw(self, word, hint=None):
-        if not self.at_kw(word):
-            self.fail(f"I expected the word '{word}' here, but found {self.describe(self.tok)}.",
-                      hint=hint)
-        return self.next()
-
     def expect_sym(self, sym, hint=None):
         if not self.at("SYMBOL", sym):
             self.fail(f"I expected '{sym}' here, but found {self.describe(self.tok)}.", hint=hint)
@@ -68,7 +89,7 @@ class Parser:
     def expect_name(self, what="a name"):
         if self.tok.kind == "KEYWORD":
             self.fail(f"'{self.tok.value}' is a SimpleTalk word, so it can't be used as {what}.",
-                      hint="Pick a different name, e.g. add 'my' in front: my_" + self.tok.value)
+                      hint=f"Pick a different name, like my_{self.tok.value}")
         if self.tok.kind != "NAME":
             self.fail(f"I expected {what} here, but found {self.describe(self.tok)}.")
         return self.next()
@@ -79,12 +100,28 @@ class Parser:
             return
         if self.at("EOF"):
             return
-        self.fail(f"I didn't expect {self.describe(self.tok)} here.",
-                  hint="Each instruction goes on its own line.")
+        hint = "Each instruction goes on its own line."
+        prev = self.tokens[self.i - 1] if self.i else None
+        if self.at("SYMBOL") and self.tok.value in "([" and self.tok.spaced and prev is not None \
+                and prev.kind in ("NAME", "SYMBOL", "TEXT") and prev.value not in ("(", "[", ","):
+            hint = f"Remove the space before '{self.tok.value}', like: name{self.tok.value}...{')' if self.tok.value == '(' else ']'}"
+        self.fail(f"I didn't expect {self.describe(self.tok)} here.", hint=hint)
 
     def skip_newlines(self):
         while self.at("NEWLINE"):
             self.next()
+
+    def starts_value(self, tok, after):
+        """Can `tok` begin a new value? Used to tell `loop i 1..5` from `loop n`."""
+        if tok.kind in ("NUMBER", "TEXT", "NAME"):
+            return True
+        if tok.kind == "KEYWORD" and tok.value in ("true", "false", "none", "not"):
+            return True
+        if tok.kind == "SYMBOL" and tok.value in ("(", "["):
+            return tok.spaced
+        if tok.kind == "SYMBOL" and tok.value == "-":
+            return tok.spaced and not after.spaced      # `-3` yes, `- 3` no
+        return False
 
     # -- program and blocks ---------------------------------------------
     def parse_program(self):
@@ -98,43 +135,43 @@ class Parser:
         body = []
         self.skip_newlines()
         while not self.at("EOF"):
-            if self.at_kw("end"):
-                self.fail("This 'end' has nothing to close.",
+            if self.at("SYMBOL", "."):
+                self.fail("This '.' has no block to close.",
                           hint="Remove it, or check the block above was opened correctly.")
             if self.at_kw("else"):
-                self.fail("This 'else' is not inside an 'if'.")
+                self.fail("This 'else' is not inside a 'when'.")
             body.append(self.statement())
             self.skip_newlines()
         return body
 
+    def at_block_end(self):
+        return self.at("SYMBOL", ".")
+
     def block(self, opener, open_tok, stop_at_else=False):
-        """Read statements until `end` (and `else` when inside an if)."""
+        """Read statements until the closing '.' (and 'else' inside a when)."""
         body = []
         self.skip_newlines()
         while True:
             if self.at("EOF"):
                 raise SyntaxProblem(
                     f"The '{opener}' that starts on line {open_tok.line} was never closed.",
-                    open_tok.line, open_tok.column, f"Add 'end {opener}' after the block.",
+                    open_tok.line, open_tok.column,
+                    "Add a line with just a dot ( . ) after the block.",
                     incomplete=True)
-            if self.at_kw("end"):
+            if self.at_block_end():
                 return body
             if self.at_kw("else"):
                 if stop_at_else:
                     return body
-                self.fail("This 'else' is not inside an 'if'.")
+                self.fail("This 'else' is not inside a 'when'.")
             body.append(self.statement())
             self.skip_newlines()
 
-    def close_block(self, opener):
-        end_tok = self.expect_kw("end")
-        if self.tok.kind == "KEYWORD" and self.tok.value in BLOCK_WORDS:
-            if self.tok.value != opener:
-                self.fail(f"This says 'end {self.tok.value}', but the open block is an '{opener}'.",
-                          hint=f"Change it to 'end {opener}'.")
-            self.next()
+    def close_block(self):
+        self.expect_sym(".")
+        if not self.at_line_end():
+            self.fail("The closing '.' must be alone on its line.")
         self.end_of_line()
-        return end_tok
 
     # -- statements ------------------------------------------------------
     def statement(self):
@@ -142,219 +179,223 @@ class Parser:
         if tok.kind == "KEYWORD":
             handler = getattr(self, f"stmt_{tok.value}", None)
             if handler:
-                node = handler()
-                return node
-        node = self.expression_statement()
+                return handler()
+        if tok.kind == "NAME":
+            self.check_old_word(tok)
+        return self.expression_statement()
+
+    def check_old_word(self, tok):
+        """Friendly hint when someone writes `say`, `print`, `if`, `set x to` ..."""
+        word = tok.value
+        nxt = self.peek()
+        if word not in OLD_WORDS:
+            if nxt.kind == "SYMBOL" and nxt.value == "=":
+                self.fail(f"To store a value, write: let {word} ...", tok,
+                          hint=f"SimpleTalk uses 'let name value', like: let {word} 5")
+            return
+        # `print(x)` with a real function called print is fine.
+        if nxt.kind == "SYMBOL" and nxt.value == "(" and not nxt.spaced:
+            return
+        new = OLD_WORDS[word]
+        if new is None:
+            self.fail(f"'{word}' isn't needed in SimpleTalk.", tok, hint="Just leave it out.")
+        if new == ".":
+            self.fail(f"Blocks end with a line holding just a dot, not '{word}'.", tok,
+                      hint="Replace this line with:  .")
+        self.fail(f"SimpleTalk doesn't use '{word}'. The word for that is '{new}'.", tok,
+                  hint=f"Write '{new}' instead of '{word}'. All words are listed in docs/LANGUAGE.md.")
+
+    def target(self, what):
+        """A variable name, optionally with a position: score, list[2], grid[1][3]."""
+        tok = self.tok
+        name = self.expect_name(what)
+        node = N.Name(name.value, line=name.line, column=name.column)
+        while self.at("SYMBOL", "[") and not self.tok.spaced:
+            br = self.next()
+            index = self.expression()
+            self.expect_sym("]")
+            node = N.Index(node, index, line=br.line, column=br.column)
         return node
 
-    def stmt_say(self):
+    def stmt_let(self):
         tok = self.next()
-        if self.at("NEWLINE") or self.at("EOF"):
-            self.fail("'say' needs something to say.", hint='Try: say "Hello!"')
-        values = [self.expression()]
-        while self.at("SYMBOL", ","):
-            self.next()
-            values.append(self.expression())
-        self.end_of_line()
-        return N.Say(values, line=tok.line, column=tok.column)
-
-    def stmt_ask(self):
-        tok = self.next()
-        prompt = self.expression()
-        self.expect_kw("into", hint='Write it like: ask "What is your name?" into name')
-        name = self.expect_name("a variable name").value
-        self.end_of_line()
-        return N.Ask(prompt, name, line=tok.line, column=tok.column)
-
-    def stmt_set(self):
-        tok = self.next()
-        target = self.postfix()
-        if not isinstance(target, (N.Name, N.Index)):
-            self.fail("After 'set' I expected a variable name, like: set score to 10", tok)
+        target = self.target("a variable name")
         if self.at("SYMBOL", "="):
-            self.fail("Use 'to' instead of '=' when setting a variable.",
-                      hint="Write it like: set score to 10")
-        self.expect_kw("to", hint="Write it like: set score to 10")
+            self.fail("'let' doesn't need '='.", hint=f"Write it like: let {self.describe_target(target)} 10")
+        if self.at_line_end():
+            self.fail("'let' needs a value to store.", hint="Write it like: let score 10")
         value = self.expression()
         self.end_of_line()
         return N.Set(target, value, line=tok.line, column=tok.column)
 
-    def stmt_change(self):
+    @staticmethod
+    def describe_target(node):
+        return node.name if isinstance(node, N.Name) else "name"
+
+    def stmt_up(self):
         tok = self.next()
-        name = self.expect_name("a variable name").value
-        self.expect_kw("by", hint="Write it like: change score by 1")
-        amount = self.expression()
+        name = self.expect_name("a variable name")
+        if self.at_line_end():
+            amount = N.Literal(1, line=tok.line, column=tok.column)
+        else:
+            amount = self.expression()
         self.end_of_line()
-        return N.Change(name, amount, line=tok.line, column=tok.column)
+        return N.Change(name.value, amount, line=tok.line, column=tok.column)
+
+    def stmt_out(self):
+        tok = self.next()
+        values = []
+        if not self.at_line_end():
+            values.append(self.expression())
+            while self.at("SYMBOL", ","):
+                self.next()
+                values.append(self.expression())
+        self.end_of_line()
+        return N.Say(values, line=tok.line, column=tok.column)
+
+    def stmt_in(self):
+        tok = self.next()
+        name = self.expect_name("a variable name to store the answer in")
+        prompt = None
+        if not self.at_line_end():
+            prompt = self.expression()
+        self.end_of_line()
+        return N.Ask(prompt, name.value, line=tok.line, column=tok.column)
+
+    def list_change(self, cls, word):
+        tok = self.next()
+        target = self.target("a list name")
+        if self.at_line_end():
+            self.fail(f"'{word}' needs a value.", hint=f'Write it like: {word} fruits "kiwi"')
+        value = self.expression()
+        self.end_of_line()
+        return cls(value, target, line=tok.line, column=tok.column)
 
     def stmt_add(self):
-        tok = self.next()
-        value = self.expression()
-        self.expect_kw("to", hint="Write it like: add \"milk\" to shopping")
-        target = self.postfix()
-        self.end_of_line()
-        return N.Add(value, target, line=tok.line, column=tok.column)
+        return self.list_change(N.Add, "add")
 
-    def stmt_remove(self):
-        tok = self.next()
-        value = self.expression()
-        self.expect_kw("from", hint="Write it like: remove \"milk\" from shopping")
-        target = self.postfix()
-        self.end_of_line()
-        return N.Remove(value, target, line=tok.line, column=tok.column)
+    def stmt_del(self):
+        return self.list_change(N.Remove, "del")
 
     def condition_line(self):
+        if self.at_line_end():
+            self.fail("'when' needs something to check.", hint="Write it like: when age > 18")
         cond = self.expression()
-        if self.at_kw("then"):
-            self.next()
-        if not self.at("NEWLINE"):
+        if not self.at_line_end():
             self.fail(f"I didn't expect {self.describe(self.tok)} here.",
-                      hint="Put the code that should run on the next line, and close it with 'end if'.")
+                      hint="Put the code that should run on the next line, and end the block with a '.' line.")
         return cond
 
-    def stmt_if(self):
+    def stmt_when(self):
         tok = self.next()
-        branches = []
-        cond = self.condition_line()
-        body = self.block("if", tok, stop_at_else=True)
-        branches.append((cond, body))
+        branches = [(self.condition_line(), self.block("when", tok, stop_at_else=True))]
         else_body = None
         while self.at_kw("else"):
             else_tok = self.next()
-            if self.at_kw("if"):
+            if self.at_kw("when"):
                 self.next()
-                cond = self.condition_line()
-                body = self.block("if", tok, stop_at_else=True)
-                branches.append((cond, body))
+                branches.append((self.condition_line(), self.block("when", tok, stop_at_else=True)))
                 continue
-            if not self.at("NEWLINE"):
-                self.fail("Put the code for 'else' on the next line.", else_tok)
-            else_body = self.block("if", tok, stop_at_else=True)
+            if not self.at_line_end():
+                self.fail("Put the code for 'else' on the next line.", else_tok,
+                          hint="For another check, write: else when ...")
+            else_body = self.block("when", tok, stop_at_else=True)
             if self.at_kw("else"):
-                self.fail("An 'if' can only have one plain 'else', and it must come last.")
+                self.fail("A 'when' can only have one plain 'else', and it must come last.")
             break
-        self.close_block("if")
+        self.close_block()
         return N.If(branches, else_body, line=tok.line, column=tok.column)
 
-    def loop_body(self, opener, open_tok):
+    def loop_body(self, open_tok):
         self.loop_depth += 1
         try:
-            body = self.block(opener, open_tok)
+            body = self.block("loop", open_tok)
         finally:
             self.loop_depth -= 1
-        self.close_block(opener)
+        self.close_block()
         return body
 
-    def stmt_repeat(self):
+    def stmt_loop(self):
         tok = self.next()
-        if self.at_kw("while", "until"):
-            until = self.next().value == "until"
+        line, col = tok.line, tok.column
+        if self.at_line_end():                                   # loop  (forever)
+            self.end_of_line()
+            return N.RepeatWhile(None, self.loop_body(tok), line=line, column=col)
+        if self.at_kw("while"):                                  # loop while x < 10
+            self.next()
+            if self.at_line_end():
+                self.fail("'loop while' needs something to check.", hint="Write it like: loop while x < 10")
             cond = self.expression()
             self.end_of_line()
-            body = self.loop_body("repeat", tok)
-            return N.RepeatWhile(cond, body, until, line=tok.line, column=tok.column)
-        if self.at_kw("forever"):
-            self.next()
+            return N.RepeatWhile(cond, self.loop_body(tok), line=line, column=col)
+        if self.at("NAME") and self.starts_value(self.peek(), self.peek(2)):
+            var = self.next().value                              # loop i 1..5 / loop f fruits
+            items = self.expression()
             self.end_of_line()
-            body = self.loop_body("repeat", tok)
-            return N.RepeatWhile(None, body, line=tok.line, column=tok.column)
-        if self.at("NEWLINE"):
-            self.fail("How many times should I repeat?",
-                      hint="Try: repeat 3 times, repeat while x < 10, or repeat forever")
-        count = self.expression()
-        self.expect_kw("times", hint="Write it like: repeat 3 times")
+            return N.ForEach(var, items, self.loop_body(tok), line=line, column=col)
+        count = self.expression()                                # loop 3
         self.end_of_line()
-        body = self.loop_body("repeat", tok)
-        return N.RepeatTimes(count, body, line=tok.line, column=tok.column)
+        return N.RepeatTimes(count, self.loop_body(tok), line=line, column=col)
 
-    def stmt_for(self):
-        tok = self.next()
-        if self.at_kw("each"):
-            self.next()
-            var = self.expect_name("a variable name").value
-            self.expect_kw("in", hint="Write it like: for each fruit in fruits")
-            iterable = self.expression()
-            self.end_of_line()
-            body = self.loop_body("for", tok)
-            return N.ForEach(var, iterable, body, line=tok.line, column=tok.column)
-        var = self.expect_name("a variable name").value
-        self.expect_kw("from", hint="Write it like: for i from 1 to 10  (or: for each x in my_list)")
-        start = self.expression()
-        self.expect_kw("to", hint="Write it like: for i from 1 to 10")
-        end = self.expression()
-        self.end_of_line()
-        body = self.loop_body("for", tok)
-        return N.ForRange(var, start, end, body, line=tok.line, column=tok.column)
+    def stmt_while(self):
+        self.fail("Write 'loop while ...' to repeat while something is true.")
 
-    def stmt_define(self):
+    def stmt_fn(self):
         tok = self.next()
         name = self.expect_name("a name for the function").value
         params = []
         if self.at("SYMBOL", "("):
-            self.next()
-            while not self.at("SYMBOL", ")"):
-                p = self.expect_name("a parameter name").value
-                if p in params:
-                    self.fail(f"The parameter '{p}' is listed twice.")
-                params.append(p)
-                if not self.at("SYMBOL", ","):
-                    break
-                self.next()
-            self.expect_sym(")")
+            self.fail("Write the inputs without brackets, separated by spaces.",
+                      hint=f"Like: fn {name} a b")
+        while not self.at_line_end():
+            if self.at("SYMBOL", ","):
+                self.fail("Separate the inputs with spaces, not commas.", hint=f"Like: fn {name} a b")
+            p = self.expect_name("an input name").value
+            if p in params:
+                self.fail(f"The input '{p}' is listed twice.")
+            params.append(p)
         self.end_of_line()
         saved_loop = self.loop_depth
         self.loop_depth = 0
         self.func_depth += 1
         try:
-            body = self.block("define", tok)
+            body = self.block("fn", tok)
         finally:
             self.func_depth -= 1
             self.loop_depth = saved_loop
-        self.close_block("define")
+        self.close_block()
         return N.Define(name, params, body, line=tok.line, column=tok.column)
 
-    def stmt_return(self):
+    def stmt_ret(self):
         tok = self.next()
         if self.func_depth == 0:
-            self.fail("'return' can only be used inside a 'define' block.", tok)
-        value = None
-        if not (self.at("NEWLINE") or self.at("EOF")):
-            value = self.expression()
+            self.fail("'ret' can only be used inside an 'fn' block.", tok)
+        value = None if self.at_line_end() else self.expression()
         self.end_of_line()
         return N.Return(value, line=tok.line, column=tok.column)
 
     def stmt_stop(self):
         tok = self.next()
         if self.loop_depth == 0:
-            self.fail("'stop' can only be used inside a loop (repeat or for).", tok)
+            self.fail("'stop' can only be used inside a 'loop'.", tok)
         self.end_of_line()
         return N.Stop(line=tok.line, column=tok.column)
 
     def stmt_skip(self):
         tok = self.next()
         if self.loop_depth == 0:
-            self.fail("'skip' can only be used inside a loop (repeat or for).", tok)
+            self.fail("'skip' can only be used inside a 'loop'.", tok)
         self.end_of_line()
         return N.Skip(line=tok.line, column=tok.column)
 
-    def stmt_end(self):
-        self.fail("This 'end' has nothing to close.")
-
     def stmt_else(self):
-        self.fail("This 'else' is not inside an 'if'.")
+        self.fail("This 'else' is not inside a 'when'.")
 
     def expression_statement(self):
         tok = self.tok
-        if tok.kind == "NAME" and self.peek().kind == "SYMBOL" and self.peek().value == "=":
-            self.fail(f"To store a value, write: set {tok.value} to ...", tok,
-                      hint="SimpleTalk uses 'set name to value' instead of '='.")
         expr = self.expression()
         if not isinstance(expr, N.Call):
-            hint = None
-            if isinstance(expr, N.Name) and self.at("TEXT"):
-                hint = f"Did you mean: say {self.describe(self.tok)}?"
-            elif isinstance(expr, N.Name):
-                hint = "To show a value use 'say', to store one use 'set ... to ...'."
+            hint = "To show a value write: out ...   To store one: let name value"
             raise SyntaxProblem("This line doesn't tell me to do anything.",
                                 tok.line, tok.column, hint)
         self.end_of_line()
@@ -388,30 +429,34 @@ class Parser:
         """Return the comparison operator at the cursor (consuming it), or None."""
         if self.at("SYMBOL") and self.tok.value in COMPARE_OPS:
             return self.next().value
-        if self.at_kw("is"):
+        if self.at_kw("has"):
             self.next()
-            if self.at_kw("not"):
-                self.next()
-                return "!="
-            return "="
-        if self.at_kw("in"):
-            self.next()
-            return "in"
+            return "has"
         return None
 
     def comparison(self):
-        left = self.additive()
+        left = self.range_expr()
         tok = self.tok
         op = self.compare_op()
         if op is None:
             return left
-        right = self.additive()
+        right = self.range_expr()
         node = N.Binary(op, left, right, line=tok.line, column=tok.column)
         second = self.tok
         if self.compare_op() is not None:
             self.fail("You can only compare two things at a time.", second,
                       hint="Join comparisons with 'and', like: x > 1 and x < 10")
         return node
+
+    def range_expr(self):
+        left = self.additive()
+        if self.at("SYMBOL", ".."):
+            tok = self.next()
+            right = self.additive()
+            left = N.Binary("..", left, right, line=tok.line, column=tok.column)
+            if self.at("SYMBOL", ".."):
+                self.fail("A range has only a start and an end, like 1..10")
+        return left
 
     def additive(self):
         left = self.multiplicative()
@@ -435,9 +480,9 @@ class Parser:
 
     def postfix(self):
         expr = self.primary()
-        while True:
-            if self.at("SYMBOL", "("):
-                tok = self.next()
+        while self.at("SYMBOL") and self.tok.value in ("(", "[") and not self.tok.spaced:
+            tok = self.next()
+            if tok.value == "(":
                 args = []
                 while not self.at("SYMBOL", ")"):
                     args.append(self.expression())
@@ -446,13 +491,11 @@ class Parser:
                     self.next()
                 self.expect_sym(")", hint="Separate values with commas, like: max(1, 2)")
                 expr = N.Call(expr, args, line=tok.line, column=tok.column)
-            elif self.at("SYMBOL", "["):
-                tok = self.next()
+            else:
                 index = self.expression()
                 self.expect_sym("]")
                 expr = N.Index(expr, index, line=tok.line, column=tok.column)
-            else:
-                return expr
+        return expr
 
     def primary(self):
         tok = self.tok
@@ -465,9 +508,9 @@ class Parser:
         if tok.kind == "NAME":
             self.next()
             return N.Name(tok.value, line=tok.line, column=tok.column)
-        if tok.kind == "KEYWORD" and tok.value in ("true", "false", "nothing"):
+        if tok.kind == "KEYWORD" and tok.value in ("true", "false", "none"):
             self.next()
-            value = {"true": True, "false": False, "nothing": None}[tok.value]
+            value = {"true": True, "false": False, "none": None}[tok.value]
             return N.Literal(value, line=tok.line, column=tok.column)
         if self.at("SYMBOL", "("):
             self.next()
@@ -487,6 +530,8 @@ class Parser:
         if tok.kind == "KEYWORD":
             self.fail(f"I didn't expect the word '{tok.value}' here.",
                       hint=f"'{tok.value}' is a SimpleTalk word, so it can't be used as a variable name.")
+        if self.at_line_end():
+            self.fail("I expected a value here, but the line ended.")
         self.fail(f"I expected a value here, but found {self.describe(tok)}.")
 
     def text_node(self, tok):
@@ -494,10 +539,9 @@ class Parser:
         parts = []
         for part in value.parts:
             if isinstance(part, TextPart):
-                sub_tokens = tokenize(part.code, part.line - 1, part.column - 1)
-                sub = Parser(sub_tokens)
+                sub = Parser(tokenize(part.code, part.line - 1, part.column - 1))
                 expr = sub.expression()
-                if not sub.at("NEWLINE") and not sub.at("EOF"):
+                if not sub.at_line_end():
                     sub.fail("I couldn't understand the code inside { }.")
                 parts.append(expr)
             else:

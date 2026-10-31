@@ -3,10 +3,10 @@
 SimpleTalk has six kinds of value:
     number   42, 3.5
     text     "hello"
-    boolean  true, false
+    bool     true, false
     list     [1, 2, 3]
-    nothing  nothing
-    function something made with `define`, or a built-in like length()
+    none     none
+    fn       something made with `fn`, or a built-in like len()
 """
 
 import math
@@ -20,7 +20,7 @@ class Function:
         self.closure = closure
 
     def __repr__(self):
-        return f"<function {self.name}>"
+        return f"<fn {self.name}>"
 
 
 class Builtin:
@@ -32,7 +32,7 @@ class Builtin:
         self.usage = usage
 
     def __repr__(self):
-        return f"<built-in function {self.name}>"
+        return f"<built-in fn {self.name}>"
 
 
 def is_number(v):
@@ -48,9 +48,9 @@ def tidy_number(n):
 
 def type_name(v):
     if v is None:
-        return "nothing"
+        return "none"
     if isinstance(v, bool):
-        return "boolean"
+        return "bool"
     if is_number(v):
         return "number"
     if isinstance(v, str):
@@ -58,14 +58,14 @@ def type_name(v):
     if isinstance(v, list):
         return "list"
     if isinstance(v, (Function, Builtin)):
-        return "function"
+        return "fn"
     return "unknown"
 
 
 def show(v, nested=False):
-    """Turn any value into the text that `say` prints."""
+    """Turn any value into the text that `out` prints."""
     if v is None:
-        return "nothing"
+        return "none"
     if v is True:
         return "true"
     if v is False:

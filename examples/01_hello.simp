@@ -1,2 +1,2 @@
-# My first SimpleTalk program
-say "Hello, World!"
+;; My first SimpleTalk program
+out "Hello, World!"

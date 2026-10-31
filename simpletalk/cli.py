@@ -1,8 +1,8 @@
 """The `simpletalk` command.
 
-    simpletalk hello.simp        run a program
+    simpletalk hello.simp           run a program
     simpletalk --check hello.simp   only check it for mistakes
-    simpletalk                   open the interactive playground
+    simpletalk                      open the interactive playground
 """
 
 import argparse
@@ -19,16 +19,17 @@ from .values import show
 BANNER = f"""SimpleTalk {__version__} - type code and press Enter.
 Type 'help' for a quick guide, or 'quit' to leave."""
 
-HELP = """Quick guide:
-  say "Hello"                    show something
-  set age to 12                  store a value
-  change age by 1                add to a number
-  ask "Name?" into name          ask the user
-  if age > 10 ... end if         make a decision
-  repeat 3 times ... end repeat  do something again
-  for each x in [1, 2] ... end   go through a list
-  define greet(name) ... end     make your own function
-Blocks continue on the next lines until you type 'end'."""
+HELP = """Quick guide (every word is 2-4 letters, blocks end with a '.' line):
+  out "Hello"                   show something
+  let age 12                    store a value
+  up age 1                      add to a number
+  in name "Your name?"          ask the user
+  when age > 10 ... else ... .  make a decision
+  loop 3 ... .                  do something 3 times
+  loop i 1..10 ... .            count
+  loop x my_list ... .          go through a list
+  fn greet name ... .           make your own function
+Type the block's lines, then a line with just '.' to run it."""
 
 
 def run_file(path, check_only=False):

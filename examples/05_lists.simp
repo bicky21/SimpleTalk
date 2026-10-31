@@ -1,17 +1,17 @@
-# Lists start at position 1. Position -1 is the last item.
-set shopping to ["milk", "eggs"]
-add "bread" to shopping
-say shopping
-say "First:", shopping[1], "| Last:", shopping[-1]
-say "Items:", length(shopping)
+;; Lists start at position 1. Position -1 is the last item.
+let shopping ["milk", "eggs"]
+add shopping "bread"
+out shopping
+out "First:", shopping[1], "| Last:", shopping[-1]
+out "Items:", len(shopping)
 
-remove "eggs" from shopping
-set shopping[1] to "oat milk"
-say shopping
+del shopping "eggs"
+let shopping[1] "oat milk"
+out shopping
 
-if "bread" in shopping then
-    say "Don't forget the bread!"
-end if
+when shopping has "bread"
+    out "Don't forget the bread!"
+.
 
-set scores to [70, 95, 82]
-say "Best:", max(scores), "Total:", sum(scores), "Sorted:", sort(scores)
+let scores [70, 95, 82]
+out "Best:", max(scores), "Total:", sum(scores), "Sorted:", sort(scores)

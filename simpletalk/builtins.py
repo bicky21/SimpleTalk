@@ -34,7 +34,7 @@ def need_whole(fn, v, what="a whole number"):
 def need_text(fn, v):
     if not isinstance(v, str):
         raise problem(f"{fn}() needs text, but got {type_name(v)} {show(v, True)}.",
-                      hint=f"Turn it into text first with text(...).")
+                      hint="Turn it into text first with txt(...).")
     return v
 
 
@@ -48,7 +48,7 @@ def need_list(fn, v):
 def b_length(x):
     if isinstance(x, (str, list)):
         return len(x)
-    raise problem(f"length() works on text or lists, not on {type_name(x)}.")
+    raise problem(f"len() works on text or lists, not on {type_name(x)}.")
 
 
 def b_number(x):
@@ -67,7 +67,7 @@ def b_number(x):
         except ValueError:
             pass
         raise problem(f'"{x}" doesn\'t look like a number.',
-                      hint="Use is_number(...) to check first.")
+                      hint="Check first with isnum(...).")
     raise problem(f"I can't turn {type_name(x)} into a number.")
 
 
@@ -108,17 +108,17 @@ def b_sqrt(x):
 
 
 def b_power(x, y):
-    need_number("power", x)
-    need_number("power", y)
+    need_number("pow", x)
+    need_number("pow", y)
     try:
         return tidy_number(x ** y)
     except (OverflowError, ZeroDivisionError):
-        raise problem("power() result is too big or not defined.")
+        raise problem("pow() result is too big or not defined.")
 
 
 def b_random(low, high):
-    low = need_whole("random", low)
-    high = need_whole("random", high)
+    low = need_whole("rand", low)
+    high = need_whole("rand", high)
     if low > high:
         low, high = high, low
     return _random.randint(low, high)
@@ -161,9 +161,9 @@ def b_trim(t):
 
 
 def b_replace(t, old, new):
-    need_text("replace", t)
-    need_text("replace", old)
-    need_text("replace", new)
+    need_text("swap", t)
+    need_text("swap", old)
+    need_text("swap", new)
     return t.replace(old, new)
 
 
@@ -195,7 +195,7 @@ def b_reverse(x):
         return list(reversed(x))
     if isinstance(x, str):
         return x[::-1]
-    raise problem(f"reverse() works on text or lists, not on {type_name(x)}.")
+    raise problem(f"rev() works on text or lists, not on {type_name(x)}.")
 
 
 def b_copy(items):
@@ -222,26 +222,26 @@ def _register(name, fn, min_args, max_args, usage):
     BUILTINS[name] = Builtin(name, fn, min_args, max_args, usage)
 
 
-_register("length", b_length, 1, 1, 'length("hello") -> 5')
-_register("number", b_number, 1, 1, 'number("42") -> 42')
-_register("is_number", b_is_number, 1, 1, 'is_number("42") -> true')
-_register("text", b_text, 1, 1, "text(42) -> \"42\"")
+_register("len", b_length, 1, 1, 'len("hello") -> 5')
+_register("num", b_number, 1, 1, 'num("42") -> 42')
+_register("isnum", b_is_number, 1, 1, 'isnum("42") -> true')
+_register("txt", b_text, 1, 1, 'txt(42) -> "42"')
+_register("type", b_type, 1, 1, 'type(42) -> "number"')
 _register("round", b_round, 1, 2, "round(3.14159, 2) -> 3.14")
 _register("abs", b_abs, 1, 1, "abs(-5) -> 5")
 _register("sqrt", b_sqrt, 1, 1, "sqrt(16) -> 4")
-_register("power", b_power, 2, 2, "power(2, 10) -> 1024")
-_register("random", b_random, 2, 2, "random(1, 6) -> a dice roll")
+_register("pow", b_power, 2, 2, "pow(2, 10) -> 1024")
+_register("rand", b_random, 2, 2, "rand(1, 6) -> a dice roll")
 _register("min", b_min, 1, None, "min(3, 1, 2) -> 1")
 _register("max", b_max, 1, None, "max([3, 1, 2]) -> 3")
 _register("sum", b_sum, 1, 1, "sum([1, 2, 3]) -> 6")
 _register("upper", b_upper, 1, 1, 'upper("hi") -> "HI"')
 _register("lower", b_lower, 1, 1, 'lower("HI") -> "hi"')
 _register("trim", b_trim, 1, 1, 'trim("  hi  ") -> "hi"')
-_register("replace", b_replace, 3, 3, 'replace("cat", "c", "b") -> "bat"')
+_register("swap", b_replace, 3, 3, 'swap("cat", "c", "b") -> "bat"')
 _register("split", b_split, 1, 2, 'split("a,b", ",") -> ["a", "b"]')
 _register("join", b_join, 1, 2, 'join(["a", "b"], "-") -> "a-b"')
 _register("sort", b_sort, 1, 1, "sort([3, 1, 2]) -> [1, 2, 3]")
-_register("reverse", b_reverse, 1, 1, "reverse([1, 2, 3]) -> [3, 2, 1]")
+_register("rev", b_reverse, 1, 1, "rev([1, 2, 3]) -> [3, 2, 1]")
 _register("copy", b_copy, 1, 1, "copy(my_list) -> a separate copy")
-_register("type", b_type, 1, 1, 'type(42) -> "number"')
 _register("wait", b_wait, 1, 1, "wait(0.5) -> pause for half a second")

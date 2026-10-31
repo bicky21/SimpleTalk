@@ -1,16 +1,16 @@
-# Decisions with if / else if / else
-set marks to 72
+;; Decisions with when / else when / else
+let marks 72
 
-if marks >= 90 then
-    say "Grade A"
-else if marks >= 70 then
-    say "Grade B"
-else if marks >= 50 then
-    say "Grade C"
+when marks >= 90
+    out "Grade A"
+else when marks >= 70
+    out "Grade B"
+else when marks >= 50
+    out "Grade C"
 else
-    say "Try again next time"
-end if
+    out "Try again next time"
+.
 
-if marks > 40 and marks is not 100 then
-    say "You passed, and there is still room to grow."
-end if
+when marks > 40 and marks != 100
+    out "You passed, and there is still room to grow."
+.
