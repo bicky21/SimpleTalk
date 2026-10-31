@@ -219,6 +219,9 @@
     color: var(--pencil);
   }
   #status { min-height: 1.2em; }
+  footer .credit { width: 100%; text-align: right; }
+  footer .credit strong { color: var(--ink); font-weight: 600; }
+  @media (max-width: 760px) { footer .credit { text-align: left; } }
 
   /* show >= and -> exactly as typed (codemirror.css turns ligatures on) */
   .CodeMirror pre.CodeMirror-line, .CodeMirror pre.CodeMirror-line-like, #output, .answers textarea {
@@ -274,6 +277,7 @@
 <footer>
   <span id="status">Starting…</span>
   <span>Runs the real SimpleTalk engine in your browser. In the browser, tasks run one after another. <a href="https://github.com/bicky21/SimpleTalk">SimpleTalk on GitHub</a> · <a href="manual/">Manual</a></span>
+  <span class="credit">Developed by <strong>Bicky Prasad Yadav</strong> and <strong>Claude</strong></span>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/lib/codemirror.js"></script>

@@ -47,3 +47,7 @@ Every example in this manual has a **Try it** button that opens it in the [playg
 15. [Two small projects](15-projects.md): a quiz and a grade book, built step by step.
 16. [Reference](16-reference.md): every keyword, operator and built-in function on one page.
 17. [Coming from Python](17-from-python.md): a side-by-side translation table.
+
+## About
+
+SimpleTalk is developed by **Bicky Prasad Yadav** and **Claude**. The language, its playground, the VS Code extension and this manual are all open source on [GitHub](https://github.com/bicky21/SimpleTalk).

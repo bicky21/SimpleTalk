@@ -179,6 +179,7 @@
   .pager .next { text-align: right; }
   .pager a:hover { border-color: var(--pencil); }
   .foot { margin-top: 40px; font-size: 14px; color: var(--pencil); max-width: 74ch; }
+  .foot.credit { margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--rule); }
 
   @media (max-width: 1200px) {
     .layout { grid-template-columns: 260px minmax(0, 1fr); }
@@ -241,6 +242,7 @@
     {{pager}}
     <p class="foot">Found a mistake in this page? <a href="{{source}}">Edit it on GitHub</a>.
       Every example on this page is run automatically, so what you see is what SimpleTalk prints.</p>
+    <p class="foot credit">SimpleTalk is developed by <strong>Bicky Prasad Yadav</strong> and <strong>Claude</strong>.</p>
   </main>
   {{toc}}
 </div>
