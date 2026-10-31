@@ -1,0 +1,162 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "SimpleTalk",
+  "scopeName": "source.simpletalk",
+  "fileTypes": ["simp"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#block-end" },
+    { "include": "#definition" },
+    { "include": "#expression" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.double-semicolon.simpletalk",
+      "match": ";;.*$"
+    },
+    "block-end": {
+      "comment": "A line holding just a dot closes a block.",
+      "match": "^\\s*(\\.)\\s*(?=;;|$)",
+      "captures": { "1": { "name": "keyword.control.block-end.simpletalk" } }
+    },
+    "definition": {
+      "patterns": [
+        {
+          "match": "^\\s*(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)((?:\\s+[A-Za-z_][A-Za-z0-9_]*)*)",
+          "captures": {
+            "1": { "name": "storage.type.function.simpletalk" },
+            "2": { "name": "entity.name.function.simpletalk" },
+            "3": { "name": "variable.parameter.simpletalk" }
+          }
+        },
+        {
+          "match": "^\\s*(task)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.task.simpletalk" },
+            "2": { "name": "entity.name.function.task.simpletalk" }
+          }
+        }
+      ]
+    },
+    "expression": {
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#string-double" },
+        { "include": "#string-single" },
+        { "include": "#number" },
+        { "include": "#keywords" },
+        { "include": "#pipeline" },
+        { "include": "#call" },
+        { "include": "#map-key" },
+        { "include": "#field" },
+        { "include": "#operator" }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.simpletalk",
+          "match": "\\b(when|else|loop|while|stop|skip|ret|try|fail|oops|pick|is|await)\\b"
+        },
+        {
+          "name": "keyword.other.statement.simpletalk",
+          "match": "\\b(let|up|out|in|add|del|watch|test|use|keep)\\b"
+        },
+        {
+          "name": "storage.type.function.simpletalk",
+          "match": "\\b(fn|task)\\b"
+        },
+        {
+          "name": "keyword.operator.word.simpletalk",
+          "match": "\\b(and|or|not|has|mod)\\b"
+        },
+        {
+          "name": "constant.language.simpletalk",
+          "match": "\\b(true|false|none)\\b"
+        }
+      ]
+    },
+    "pipeline": {
+      "patterns": [
+        {
+          "match": "(\\|)\\s*(only|each)\\b",
+          "captures": {
+            "1": { "name": "keyword.operator.pipe.simpletalk" },
+            "2": { "name": "keyword.other.pipeline.simpletalk" }
+          }
+        },
+        { "name": "keyword.operator.pipe.simpletalk", "match": "\\|" },
+        { "name": "variable.language.it.simpletalk", "match": "\\bit\\b" }
+      ]
+    },
+    "call": {
+      "patterns": [
+        {
+          "name": "support.function.builtin.simpletalk",
+          "match": "\\b(len|num|isnum|txt|type|round|abs|sqrt|pow|rand|min|max|sum|upper|lower|trim|swap|split|join|sort|rev|copy|wait|keys|values|read|write|load|save|exists)(?=\\()"
+        },
+        {
+          "name": "entity.name.function.call.simpletalk",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\()"
+        }
+      ]
+    },
+    "map-key": {
+      "match": "(?<=[{,])\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(:)",
+      "captures": {
+        "1": { "name": "variable.other.key.simpletalk" },
+        "2": { "name": "punctuation.separator.key-value.simpletalk" }
+      }
+    },
+    "field": {
+      "match": "(?<=[A-Za-z0-9_\\]\\)])(\\.)([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "punctuation.accessor.simpletalk" },
+        "2": { "name": "variable.other.property.simpletalk" }
+      }
+    },
+    "number": {
+      "name": "constant.numeric.simpletalk",
+      "match": "\\b\\d[\\d_]*(\\.\\d[\\d_]*)?\\b"
+    },
+    "operator": {
+      "patterns": [
+        { "name": "keyword.operator.range.simpletalk", "match": "\\.\\." },
+        { "name": "keyword.operator.arrow.simpletalk", "match": "->" },
+        { "name": "keyword.operator.comparison.simpletalk", "match": "!=|<=|>=|=|<|>" },
+        { "name": "keyword.operator.arithmetic.simpletalk", "match": "[+\\-*/]" }
+      ]
+    },
+    "string-double": {
+      "name": "string.quoted.double.simpletalk",
+      "begin": "\"",
+      "end": "\"|$",
+      "patterns": [
+        { "include": "#escape" },
+        { "include": "#interpolation" }
+      ]
+    },
+    "string-single": {
+      "name": "string.quoted.single.simpletalk",
+      "begin": "'",
+      "end": "'|$",
+      "patterns": [
+        { "include": "#escape" },
+        { "include": "#interpolation" }
+      ]
+    },
+    "escape": {
+      "name": "constant.character.escape.simpletalk",
+      "match": "\\\\[nt\\\\\"'{}]|\\{\\{|\\}\\}"
+    },
+    "interpolation": {
+      "name": "meta.interpolation.simpletalk",
+      "begin": "\\{",
+      "end": "\\}|$",
+      "beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.simpletalk" } },
+      "endCaptures": { "0": { "name": "punctuation.section.interpolation.end.simpletalk" } },
+      "contentName": "source.simpletalk",
+      "patterns": [ { "include": "#expression" } ]
+    }
+  }
+}

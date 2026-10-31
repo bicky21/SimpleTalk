@@ -10,3 +10,6 @@ dist/
 
 # files written by example programs
 *.memory.json
+
+# playground build output
+_site/

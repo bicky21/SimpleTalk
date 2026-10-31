@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.3.0 – 2026-10-31
+
+Faster, and easier to start with.
+
+### Added
+- **Online playground** (`playground/`, published with GitHub Pages): runs the real engine in the
+  browser through Pyodide in a Web Worker. Examples menu, Explain, answers for `in`, Stop for
+  runaway programs, shareable links, `keep` remembered in the browser, light and dark themes,
+  works on phones. `?pyodide=/path/` loads the engine from your own server (for offline classrooms).
+- **VS Code extension** (`editors/vscode/`): highlighting, snippets, auto-indent, `;;` comment toggling.
+- `benchmarks/` with two programs used to measure speed.
+
+### Changed
+- **Faster engine** (`compiler.py`): programs are compiled to Python closures before running,
+  4–5× faster on loops and calls. Identical output and error messages, checked by running
+  8,607 random programs through the old and new engines.
+
 ## 2.2.0 – 2026-10-31
 
 Advanced features, still pure Python with no dependencies.

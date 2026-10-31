@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SimpleTalk Playground</title>
+<meta name="description" content="Write and run SimpleTalk programs in your browser. Nothing to install.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/lib/codemirror.css">
+<style>
+  :root {
+    --paper: #F1F5FB;
+    --paper-raised: #FAFCFF;
+    --rule: #D3DEEC;
+    --margin: #E2687A;
+    --ink: #1C2A52;
+    --pencil: #5E6A85;
+    --highlight: #FFD447;
+    --link: #2F67B1;
+    --problem: #B4233C;
+    --problem-bg: #FCEBEE;
+    --note: #2C6B3F;
+    --line-h: 26px;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+    --serif: "Fraunces", Georgia, serif;
+    --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #121A33;
+      --paper-raised: #182244;
+      --rule: #243159;
+      --margin: #C9566A;
+      --ink: #E4EAF6;
+      --pencil: #9AA6C2;
+      --highlight: #FFD447;
+      --link: #8DB4F0;
+      --problem: #FF9AAB;
+      --problem-bg: #3A1B2A;
+      --note: #8FD6A3;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--ui);
+    display: flex;
+    flex-direction: column;
+  }
+  a { color: var(--link); }
+  button, select { font: 500 15px var(--ui); color: var(--ink); }
+
+  header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .wordmark {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 30px;
+    letter-spacing: -0.5px;
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 3px;
+  }
+  .wordmark .dot {
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: var(--highlight);
+    display: inline-block;
+  }
+  .wordmark small {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 19px;
+    color: var(--pencil);
+    margin-left: 10px;
+  }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; align-items: center; }
+  .toolbar select, .toolbar button {
+    height: 38px;
+    padding: 0 14px;
+    border-radius: 8px;
+    border: 1px solid var(--rule);
+    background: var(--paper-raised);
+    cursor: pointer;
+  }
+  .toolbar button:hover, .toolbar select:hover { border-color: var(--pencil); }
+  .toolbar button:disabled { opacity: 0.5; cursor: default; }
+  #run {
+    background: var(--highlight);
+    border-color: var(--highlight);
+    color: #1C2A52;
+    font-weight: 700;
+    padding: 0 18px;
+  }
+  #stop { border-color: var(--problem); color: var(--problem); }
+  :focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
+
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    min-height: 0;
+  }
+  .pane { display: flex; flex-direction: column; min-height: 0; }
+  .pane + .pane { border-left: 1px solid var(--rule); }
+  .label {
+    font: 600 14px var(--ui);
+    color: var(--pencil);
+    padding: 10px 20px 6px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .label .hint { font-weight: 400; }
+
+  /* The editor is an exercise-book page: ruled lines and a red margin. */
+  .editor { flex: 1; min-height: 0; position: relative; }
+  .CodeMirror {
+    height: 100%;
+    font-family: var(--mono);
+    font-size: 15px;
+    line-height: var(--line-h);
+    color: var(--ink);
+    background:
+      linear-gradient(to right, transparent 46px, var(--margin) 46px, var(--margin) 48px, transparent 48px),
+      repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--line-h) - 1px), var(--rule) calc(var(--line-h) - 1px), var(--rule) var(--line-h));
+    background-attachment: local;
+  }
+  .CodeMirror-lines { padding: 0; }
+  .CodeMirror pre.CodeMirror-line, .CodeMirror pre.CodeMirror-line-like { padding-left: 14px; }
+  .CodeMirror-gutters { background: transparent; border-right: none; width: 46px; }
+  .CodeMirror-linenumber { color: var(--pencil); font-size: 12px; padding: 0 8px 0 0; }
+  .CodeMirror-cursor { border-left: 2px solid var(--ink); }
+  .CodeMirror-selected, .CodeMirror-focused .CodeMirror-selected { background: rgba(47, 103, 177, 0.18); }
+  .CodeMirror-activeline-background { background: rgba(255, 212, 71, 0.16); }
+  .CodeMirror-matchingbracket { color: inherit !important; text-decoration: underline; }
+  .cm-s-default .cm-keyword { color: var(--ink); font-weight: 700; }
+  .cm-s-default .cm-def { color: var(--link); font-weight: 700; }
+  .cm-s-default .cm-string { color: var(--link); }
+  .cm-s-default .cm-number, .cm-s-default .cm-atom { color: #B2531F; }
+  .cm-s-default .cm-comment { color: var(--pencil); font-style: italic; }
+  .cm-s-default .cm-builtin { color: var(--note); }
+  .cm-s-default .cm-operator { color: var(--pencil); }
+  .cm-s-default .cm-variable-2 { color: #8A4FB8; }
+  /* the closing dot of a block, drawn like the banner's highlighter dot */
+  .cm-s-default .cm-blockend {
+    background: var(--highlight);
+    color: #1C2A52;
+    border-radius: 50%;
+    padding: 0 5px;
+    font-weight: 700;
+  }
+  @media (prefers-color-scheme: dark) {
+    .cm-s-default .cm-number, .cm-s-default .cm-atom { color: #F2B27A; }
+    .cm-s-default .cm-variable-2 { color: #CDA6F0; }
+    .CodeMirror-activeline-background { background: rgba(255, 212, 71, 0.08); }
+  }
+
+  #output {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    margin: 0;
+    padding: 4px 20px 16px;
+    font: 14px/1.6 var(--mono);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  #output .problem {
+    display: block;
+    color: var(--problem);
+    background: var(--problem-bg);
+    border-left: 3px solid var(--problem);
+    padding: 8px 12px;
+    margin: 8px 0;
+    border-radius: 0 6px 6px 0;
+  }
+  #output .note { color: var(--note); display: block; }
+  #output .placeholder { color: var(--pencil); font-family: var(--ui); white-space: normal; }
+  .answers {
+    border-top: 1px solid var(--rule);
+    padding-bottom: 12px;
+  }
+  .answers textarea {
+    display: block;
+    width: calc(100% - 40px);
+    margin: 0 20px;
+    height: 76px;
+    resize: vertical;
+    font: 14px/1.5 var(--mono);
+    color: var(--ink);
+    background: var(--paper-raised);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+
+  footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    justify-content: space-between;
+    padding: 10px 20px;
+    border-top: 1px solid var(--rule);
+    font-size: 14px;
+    color: var(--pencil);
+  }
+  #status { min-height: 1.2em; }
+
+  @media (max-width: 760px) {
+    html, body { height: auto; }
+    main { flex: none; grid-template-columns: 1fr; grid-template-rows: 55vh auto; }
+    .label .hint.keys { display: none; }
+    .pane + .pane { border-left: none; border-top: 1px solid var(--rule); }
+    #output { min-height: 200px; }
+    header { padding: 12px 16px; }
+    .toolbar { margin-left: 0; width: 100%; }
+    .toolbar select { flex: 1 1 100%; }
+    .toolbar button { flex: 1; }
+    .label, #output { padding-left: 16px; padding-right: 16px; }
+    .answers textarea { width: calc(100% - 32px); margin: 0 16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1 class="wordmark">SimpleTalk<span class="dot" aria-hidden="true"></span><small>Playground</small></h1>
+  <div class="toolbar">
+    <select id="examples" aria-label="Load an example program">
+      <option value="">Examples…</option>
+    </select>
+    <button id="explain" type="button" title="Describe the program in plain English" disabled>Explain</button>
+    <button id="share" type="button" title="Copy a link to this program">Share</button>
+    <button id="stop" type="button" hidden>Stop</button>
+    <button id="run" type="button" title="Run (Ctrl+Enter)" disabled>Run</button>
+  </div>
+</header>
+
+<main>
+  <section class="pane" aria-label="Program">
+    <div class="label"><span>Program</span><span class="hint keys">Ctrl+Enter runs it</span></div>
+    <div class="editor"><textarea id="code" aria-label="SimpleTalk program"></textarea></div>
+  </section>
+  <section class="pane" aria-label="Output">
+    <div class="label"><span>Output</span><button id="clear" type="button" style="border:0;background:none;color:var(--link);cursor:pointer;padding:0">Clear</button></div>
+    <pre id="output" aria-live="polite"><span class="placeholder">Press Run to see what your program does.</span></pre>
+    <div class="answers">
+      <label class="label" for="answers"><span>Answers for <code>in</code></span><span class="hint">one per line, used in order</span></label>
+      <textarea id="answers" spellcheck="false" placeholder="Bicky&#10;20"></textarea>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span id="status">Starting…</span>
+  <span>Runs the real SimpleTalk engine in your browser. In the browser, tasks run one after another. <a href="https://github.com/bicky21/SimpleTalk">SimpleTalk on GitHub</a> · <a href="https://github.com/bicky21/SimpleTalk/blob/master/docs/LANGUAGE.md">Language guide</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/lib/codemirror.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/mode/simple.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/selection/active-line.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/edit/matchbrackets.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/comment/comment.js"></script>
+<script>
+(() => {
+  const STARTER = `;; Welcome! Change anything and press Run.
+let name "Bicky"
+out "Hi {name}!"
+
+fn square n
+    ret n * n
+.
+test square(4) = 16
+
+loop i 1..5
+    out "{i} squared is {square(i)}"
+.
+
+let scores [70, 95, 40, 82]
+out scores | only it > 50 | each it * 2 | sort
+`;
+  const BUILTINS = "len|num|isnum|txt|type|round|abs|sqrt|pow|rand|min|max|sum|upper|lower|trim|swap|split|join|sort|rev|copy|wait|keys|values|read|write|load|save|exists";
+
+  CodeMirror.defineSimpleMode("simpletalk", {
+    start: [
+      { regex: /;;.*/, token: "comment" },
+      { regex: /^\s*\.(?=\s*(;;|$))/, token: "blockend", sol: true },
+      { regex: /"(?:[^\\"]|\\.)*?(?:"|$)/, token: "string" },
+      { regex: /'(?:[^\\']|\\.)*?(?:'|$)/, token: "string" },
+      { regex: /(fn|task)(\s+)([A-Za-z_]\w*)/, token: ["keyword", null, "def"], sol: true },
+      { regex: /\b(?:when|else|loop|while|stop|skip|ret|try|fail|oops|pick|is|await|let|up|out|in|add|del|watch|test|use|keep|fn|task|and|or|not|has|mod)\b/, token: "keyword" },
+      { regex: /\b(?:true|false|none)\b/, token: "atom" },
+      { regex: new RegExp("\\b(?:" + BUILTINS + ")(?=\\()"), token: "builtin" },
+      { regex: /\|\s*(?:only|each)\b/, token: "keyword" },
+      { regex: /\bit\b/, token: "variable-2" },
+      { regex: /\d[\d_]*(?:\.\d[\d_]*)?/, token: "number" },
+      { regex: /\.\.|->|!=|<=|>=|[=<>+\-*\/|]/, token: "operator" },
+    ],
+    meta: { lineComment: ";;" },
+  });
+
+  const $ = (id) => document.getElementById(id);
+  const output = $("output"), status = $("status");
+  const runBtn = $("run"), stopBtn = $("stop"), explainBtn = $("explain");
+
+  const editor = CodeMirror.fromTextArea($("code"), {
+    mode: "simpletalk",
+    lineNumbers: true,
+    indentUnit: 4,
+    tabSize: 4,
+    indentWithTabs: false,
+    styleActiveLine: true,
+    matchBrackets: true,
+    lineWrapping: false,
+    extraKeys: {
+      "Ctrl-Enter": () => run("run"),
+      "Cmd-Enter": () => run("run"),
+      "Ctrl-/": "toggleComment",
+      "Cmd-/": "toggleComment",
+      Tab: (cm) => cm.somethingSelected() ? cm.indentSelection("add") : cm.replaceSelection("    "),
+      Enter: (cm) => {
+        // keep the indent; indent after a line that opens a block
+        const line = cm.getLine(cm.getCursor().line);
+        let indent = line.match(/^\s*/)[0];
+        if (/^\s*(when|else|loop|fn|try|fail|pick|is|task)\b/.test(line)) indent += "    ";
+        cm.replaceSelection("\n" + indent);
+      },
+    },
+  });
+
+  // ---------------------------------------------------------------- loading code
+  function fromHash() {
+    const m = location.hash.match(/^#code=([A-Za-z0-9_-]*)/);
+    if (!m) return null;
+    try {
+      const b64 = m[1].replace(/-/g, "+").replace(/_/g, "/");
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      return new TextDecoder().decode(bytes);
+    } catch { return null; }
+  }
+  function toHash(text) {
+    let bin = "";
+    new TextEncoder().encode(text).forEach((b) => (bin += String.fromCharCode(b)));
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function saved(key, fallback) {
+    try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; }
+  }
+  function store(key, value) {
+    try { value == null ? localStorage.removeItem(key) : localStorage.setItem(key, value); } catch {}
+  }
+
+  editor.setValue(fromHash() ?? saved("simpletalk.code", STARTER));
+  $("answers").value = saved("simpletalk.answers", "");
+  editor.on("change", () => store("simpletalk.code", editor.getValue()));
+  $("answers").addEventListener("input", (e) => store("simpletalk.answers", e.target.value));
+
+  fetch("bundle.json").then((r) => r.json()).then((bundle) => {
+    const select = $("examples");
+    for (const ex of bundle.examples) {
+      const opt = document.createElement("option");
+      opt.value = ex.file;
+      opt.textContent = ex.title;
+      select.append(opt);
+    }
+    select.addEventListener("change", () => {
+      const ex = bundle.examples.find((e) => e.file === select.value);
+      if (ex) {
+        editor.setValue(ex.code);
+        $("answers").value = ex.answers || "";
+        store("simpletalk.answers", $("answers").value);
+        history.replaceState(null, "", location.pathname + location.search);
+        clearOutput(`Loaded ${ex.title}. Press Run.`);
+      }
+      select.value = "";
+      editor.focus();
+    });
+  }).catch(() => {});
+
+  // ---------------------------------------------------------------- output
+  function clearOutput(placeholder) {
+    output.textContent = "";
+    if (placeholder) {
+      const p = document.createElement("span");
+      p.className = "placeholder";
+      p.textContent = placeholder;
+      output.append(p);
+    }
+  }
+  function write(text, cls) {
+    const ph = output.querySelector(".placeholder");
+    if (ph) ph.remove();
+    const nearBottom = output.scrollHeight - output.scrollTop - output.clientHeight < 40;
+    if (cls) {
+      const prev = output.lastChild;
+      if (prev && prev.nodeType === Node.TEXT_NODE && prev.data.endsWith("\n")) prev.data = prev.data.slice(0, -1);
+      const span = document.createElement("span");
+      span.className = cls;
+      span.textContent = text;
+      output.append(span);
+    } else {
+      output.append(document.createTextNode(text + "\n"));
+    }
+    if (nearBottom) output.scrollTop = output.scrollHeight;
+  }
+  $("clear").addEventListener("click", () => clearOutput());
+
+  // ---------------------------------------------------------------- engine
+  let worker = null, ready = false, running = false;
+
+  function startWorker() {
+    ready = false;
+    const own = new URLSearchParams(location.search).get("pyodide");   // self-hosted engine
+    const url = own ? `worker.js?pyodide=${encodeURIComponent(new URL(own, location.href))}` : "worker.js";
+    worker = new Worker(url, { type: "module" });
+    worker.onmessage = (event) => {
+      const msg = event.data;
+      if (msg.type === "status") status.textContent = msg.text;
+      else if (msg.type === "ready") {
+        ready = true;
+        status.textContent = `Ready. SimpleTalk ${msg.version}, running in your browser.`;
+        setRunning(false);
+      } else if (msg.type === "out") write(msg.text);
+      else if (msg.type === "note") write(msg.text, "note");
+      else if (msg.type === "problem") write(msg.text, "problem");
+      else if (msg.type === "fatal") { write(msg.text, "problem"); status.textContent = "The engine stopped."; }
+      else if (msg.type === "done") {
+        store("simpletalk.memory", msg.memory);
+        status.textContent = `Finished in ${msg.ms} ms.`;
+        setRunning(false);
+      }
+    };
+    worker.onerror = () => { status.textContent = "The engine could not load. Check your connection and reload."; };
+  }
+
+  function setRunning(on) {
+    running = on;
+    runBtn.disabled = on || !ready;
+    explainBtn.disabled = on || !ready;
+    stopBtn.hidden = !on;
+    runBtn.hidden = on;
+  }
+
+  function run(mode) {
+    if (!ready || running) return;
+    clearOutput();
+    setRunning(true);
+    status.textContent = mode === "explain" ? "Reading your program..." : "Running...";
+    const answers = $("answers").value.split("\n").map((s) => s.replace(/\r$/, ""));
+    while (answers.length && answers[answers.length - 1] === "") answers.pop();
+    worker.postMessage({
+      type: "run", mode,
+      code: editor.getValue(),
+      answers,
+      memory: saved("simpletalk.memory", null),
+    });
+  }
+
+  runBtn.addEventListener("click", () => run("run"));
+  explainBtn.addEventListener("click", () => run("explain"));
+  stopBtn.addEventListener("click", () => {
+    worker.terminate();
+    write("Stopped.", "note");
+    setRunning(false);
+    runBtn.disabled = true;
+    status.textContent = "Stopped. Restarting the engine...";
+    startWorker();
+  });
+
+  $("share").addEventListener("click", async () => {
+    const url = `${location.origin}${location.pathname}${location.search}#code=${toHash(editor.getValue())}`;
+    history.replaceState(null, "", url);
+    try {
+      await navigator.clipboard.writeText(url);
+      status.textContent = "Link copied. Anyone who opens it sees this program.";
+    } catch {
+      status.textContent = "Link ready in the address bar. Copy it to share this program.";
+    }
+  });
+
+  startWorker();
+  setRunning(false);
+})();
+</script>
+</body>
+</html>

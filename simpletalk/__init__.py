@@ -10,7 +10,7 @@ from .errors import RuntimeProblem, SimpleTalkError, SyntaxProblem
 from .interpreter import Interpreter
 from .parser import parse
 
-__version__ = "2.2.0"
+__version__ = "2.3.0"
 __all__ = ["run", "parse", "Interpreter", "SimpleTalkError", "SyntaxProblem",
            "RuntimeProblem", "__version__"]
 

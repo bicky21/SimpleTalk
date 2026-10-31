@@ -656,3 +656,36 @@ def test_piping_output_into_a_closed_reader_is_quiet(tmp_path):
     err = p.stderr.read().decode()
     p.wait(timeout=10)
     assert "Traceback" not in err and "BrokenPipe" not in err
+
+
+# ---------------------------------------------------------------- 2.3: fast engine, playground
+def test_compiled_engine_matches_slow_paths():
+    # whole numbers take the fast path; decimals, text and errors take the shared slow path
+    assert out("out 2 + 3, 2.5 + 1, \"a\" + 1, 7 - 2, 7 / 2, 7 mod 3, 3 = 3.0, \"a\" != \"b\"") == \
+        ["5 3.5 a1 5 3.5 1 true true"]
+    assert out("let x 5\nup x 2.5\nout x\nloop 2.0\n out 1\n.") == ["7.5", "1", "1"]
+    err = problem("loop 2.5\n.", RuntimeProblem)
+    assert "whole number" in err.message and err.line == 1
+
+
+def test_compiled_code_is_reused_and_isolated():
+    from simpletalk import Interpreter, parse
+    prog = parse("let n 0\nloop 3\n up n\n.\nout n")
+    a, b = [], []
+    Interpreter(output=a.append).run(prog)
+    Interpreter(output=b.append).run(prog)        # same tree, second interpreter
+    assert a == b == ["3"]
+
+
+def test_playground_bundle_has_engine_and_examples():
+    import json
+    import runpy
+    root = pathlib.Path(__file__).parent.parent
+    runpy.run_path(str(root / "playground" / "build.py"), run_name="__main__")
+    bundle = json.loads((root / "_site" / "bundle.json").read_text(encoding="utf-8"))
+    engine_files = {f"simpletalk/{p.name}" for p in (root / "simpletalk").glob("*.py")}
+    assert set(bundle["engine"]) == engine_files
+    assert any(e["file"] == "01_hello.simp" for e in bundle["examples"])
+    assert "lib/geometry.simp" in bundle["library"]
+    for name in ("index.html", "worker.js", "bundle.json"):
+        assert (root / "_site" / name).exists()

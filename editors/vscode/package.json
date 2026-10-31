@@ -1,0 +1,49 @@
+{
+  "name": "simpletalk",
+  "displayName": "SimpleTalk",
+  "description": "Syntax highlighting, snippets and auto-indent for the SimpleTalk programming language (.simp files).",
+  "version": "2.3.0",
+  "publisher": "bicky21",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bicky21/SimpleTalk"
+  },
+  "homepage": "https://github.com/bicky21/SimpleTalk#readme",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets"
+  ],
+  "keywords": ["simpletalk", "simp", "education", "beginner"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "simpletalk",
+        "aliases": ["SimpleTalk", "simpletalk"],
+        "extensions": [".simp"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "simpletalk",
+        "scopeName": "source.simpletalk",
+        "path": "./syntaxes/simpletalk.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "simpletalk",
+        "path": "./snippets/simpletalk.json"
+      }
+    ],
+    "configurationDefaults": {
+      "[simpletalk]": {
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true
+      }
+    }
+  }
+}

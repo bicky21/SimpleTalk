@@ -4,12 +4,13 @@
 
 <p align="center">
   <a href="https://github.com/bicky21/SimpleTalk/actions/workflows/tests.yml"><img src="https://github.com/bicky21/SimpleTalk/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/version-2.2.0-1C2A52" alt="Version 2.2.0">
+  <img src="https://img.shields.io/badge/version-2.3.0-1C2A52" alt="Version 2.3.0">
   <img src="https://img.shields.io/badge/python-3.10%2B-2F67B1" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/dependencies-none-66728C" alt="No dependencies">
 </p>
 
 <p align="center">
+  <a href="https://bicky21.github.io/SimpleTalk/"><b>Try it in your browser</b></a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#what-makes-simpletalk-different">What's different</a> ·
   <a href="#the-language-in-one-minute">The language</a> ·
@@ -36,6 +37,10 @@ loop i 1..5
 
 ## Quick start
 
+**No install:** open the [online playground](https://bicky21.github.io/SimpleTalk/). It runs the real SimpleTalk engine in your browser, with every example, Explain, and shareable links.
+
+**On your computer:**
+
 ```bash
 git clone https://github.com/bicky21/SimpleTalk.git
 cd SimpleTalk
@@ -43,10 +48,12 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -e .
 
 simpletalk examples/01_hello.simp      # run a program
-simpletalk                             # open the playground
+simpletalk                             # interactive mode
 ```
 
 On Windows, activate the environment with `.venv\Scripts\activate`. To skip installing, run `python3 -m simpletalk <file>` from the project folder.
+
+**In VS Code:** install the extension from [`editors/vscode/simpletalk-2.3.0.vsix`](editors/vscode) (Extensions view → `...` → *Install from VSIX...*). You get syntax highlighting, snippets (type `loop` + Tab) and auto-indent for `.simp` files.
 
 ## What makes SimpleTalk different
 
@@ -205,6 +212,13 @@ That's nearly the whole language. The [full guide](docs/LANGUAGE.md) covers ever
 
 The features people usually reach for a "serious" language to get are all part of SimpleTalk, with the same short words. The whole interpreter is pure Python with no dependencies. "Hello, World!" starts in well under a tenth of a second and peaks around 17 MB of memory, so an old laptop or a Raspberry Pi is plenty.
 
+Programs are compiled into ready-to-run Python functions before they start, which made SimpleTalk 4–5× faster in version 2.3 without changing a single error message:
+
+| Benchmark (2-core laptop) | 2.2 | 2.3 |
+|---|---|---|
+| [Add up 1 to 1,000,000](benchmarks/count_million.simp) | 1.6 s | 0.34 s |
+| [Loops, recursion, lists, maps, pipelines](benchmarks/mixed.simp) | 1.26 s | 0.29 s |
+
 **Maps**: named values, nested freely with lists.
 ```
 let me {name: "Bicky", skills: ["Python"]}
@@ -291,10 +305,13 @@ simpletalk/
   lexer.py        text   → tokens
   parser.py       tokens → syntax tree, with friendly syntax errors
   interpreter.py  runs the tree: maps, pipelines, try, use, keep, tasks, watch, test
+  compiler.py     turns the tree into fast Python functions before running
   runner.py       runs programs on a big-stack thread; Ctrl+C and input handling
   explain.py      syntax tree → plain English (--explain)
   builtins.py     len, sort, rand, keys, … (plus read/write/load/save in the interpreter)
-  cli.py          the simpletalk command and playground
+  cli.py          the simpletalk command and interactive mode
+playground/       the browser playground (Pyodide in a Web Worker)
+editors/vscode/   the VS Code extension
 ```
 
 Contributions are welcome. Run `pip install -e ".[dev]"` and `python -m pytest` before opening a pull request.
