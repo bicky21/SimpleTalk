@@ -8,6 +8,7 @@ import time
 
 from . import nodes as N
 from .builtins import BUILTINS
+from .compiler import compile_block, compile_expr, compile_stmt
 from .runner import run_protected, start_thread
 from .errors import RuntimeProblem, SimpleTalkError, UserProblem, did_you_mean
 from .values import (Builtin, Function, TaskValue, equal, is_number, show, tidy_number,
@@ -106,6 +107,7 @@ class Interpreter:
         self.memory = None                  # `keep`: values saved by earlier runs
         self.tasks = []                     # `task`: everything started
         self.tests_lock = threading.Lock()
+        self._blocks = {}                   # compiled statement lists (see compiler.py)
         self.source = None                  # the file being run right now (for error messages)
         self.filename = None
         self.add_file_builtins()
@@ -145,21 +147,22 @@ class Interpreter:
             raise RuntimeProblem("The program went too deep (too many nested calls).",
                                  hint="Check that every function that calls itself has a way to stop.")
 
+    MISSING = _MISSING   # "this variable had no value before"
+
     def exec_block(self, body, scope):
-        for stmt in body:
-            self.execute(stmt, scope)
+        """Run a list of statements, using the compiled (fast) version of it."""
+        entry = self._blocks.get(id(body))
+        if entry is None or entry[0] is not body:
+            entry = (body, compile_block(self, body))   # keeps `body` alive, so its id stays unique
+            self._blocks[id(body)] = entry
+        entry[1](scope)
 
     def execute(self, node, scope):
-        if self.interrupted:
-            raise KeyboardInterrupt
-        if self.trace is not None:
-            self.trace(node.line)
-        try:
-            getattr(self, "exec_" + type(node).__name__)(node, scope)
-        except SimpleTalkError as err:
-            if err.line is None:
-                err.line, err.column = node.line, node.column
-            raise
+        compiled = node.__dict__.get("_step")
+        if compiled is None or compiled[0] is not self:
+            compiled = (self, compile_stmt(self, node))
+            node._step = compiled
+        compiled[1](scope)
 
     def fail(self, node, message, hint=None):
         raise RuntimeProblem(message, node.line, node.column, hint)
@@ -279,6 +282,9 @@ class Interpreter:
                       hint=f"Create it first: let {node.name} 0")
         current = owner.vars[node.name]
         amount = self.eval(node.amount, scope)
+        self.change_value(node, owner, current, amount)
+
+    def change_value(self, node, owner, current, amount):
         if not is_number(current):
             self.fail(node, f"'{node.name}' is {type_name(current)}, so 'up' can't add a number to it.")
         if not is_number(amount):
@@ -599,7 +605,13 @@ class Interpreter:
         return True
 
     def exec_RepeatTimes(self, node, scope):
-        count = self.eval(node.count, scope)
+        count = self.check_count(node, self.eval(node.count, scope))
+        for _ in range(count):
+            if not self.run_loop_body(node.body, scope):
+                break
+
+    def check_count(self, node, count):
+        """The number for `loop N`, as a whole number, or a friendly error."""
         if not is_number(count) or (isinstance(count, float) and not count.is_integer()):
             hint = None
             if isinstance(count, list):
@@ -607,9 +619,7 @@ class Interpreter:
             self.fail(node, f"'loop' needs a whole number of times, not {show(count, True)}.", hint)
         if count < 0:
             self.fail(node, f"I can't loop {show(count)} times.")
-        for _ in range(int(count)):
-            if not self.run_loop_body(node.body, scope):
-                break
+        return int(count)
 
     def exec_RepeatWhile(self, node, scope):
         while True:
@@ -629,8 +639,14 @@ class Interpreter:
             if isinstance(items, (str, list, dict)):
                 items = list(items)    # loop over a copy (a map gives its keys)
             else:
-                self.fail(node, f"'loop {node.var} ...' needs a list, text or range, but got {type_name(items)}.",
-                          hint=f"To count, use a range: loop {node.var} 1..10")
+                self.bad_loop_items(node, items)
+        self._loop_items(node, items, scope)
+
+    def bad_loop_items(self, node, items):
+        self.fail(node, f"'loop {node.var} ...' needs a list, text or range, but got {type_name(items)}.",
+                  hint=f"To count, use a range: loop {node.var} 1..10")
+
+    def _loop_items(self, node, items, scope):
         for item in items:
             old = scope.vars.get(node.var, _MISSING)
             scope.vars[node.var] = item
@@ -682,15 +698,21 @@ class Interpreter:
 
     # ------------------------------------------------------------- expressions
     def eval(self, node, scope):
+        compiled = node.__dict__.get("_expr")
+        if compiled is None or compiled[0] is not self:
+            compiled = (self, compile_expr(self, node))
+            node._expr = compiled
         try:
-            return getattr(self, "eval_" + type(node).__name__)(node, scope)
+            return compiled[1](scope)
         except SimpleTalkError as err:
             if err.line is None:
                 err.line, err.column = node.line, node.column
             raise
 
     def truth(self, node, scope, where):
-        value = self.eval(node, scope)
+        return self.need_bool(node, self.eval(node, scope), where)
+
+    def need_bool(self, node, value, where):
         if isinstance(value, bool):
             return value
         self.fail(node, f"'{where}' needs true or false, but got {type_name(value)} {show(value, True)}.",
@@ -737,9 +759,10 @@ class Interpreter:
                 return True
             return self.truth(node.right, scope, op)
 
-        a = self.eval(node.left, scope)
-        b = self.eval(node.right, scope)
+        return self.binop(node, op, self.eval(node.left, scope), self.eval(node.right, scope))
 
+    def binop(self, node, op, a, b):
+        """Every operator except and / or / .. once both sides are worked out."""
         if op == "=":
             return equal(a, b)
         if op == "!=":
@@ -811,8 +834,9 @@ class Interpreter:
         return index - 1 if index > 0 else size + index
 
     def eval_Index(self, node, scope):
-        container = self.eval(node.target, scope)
-        index = self.eval(node.index, scope)
+        return self.index_value(node, self.eval(node.target, scope), self.eval(node.index, scope))
+
+    def index_value(self, node, container, index):
         if isinstance(container, dict):
             return self.map_get(node, container, self.map_key(node, index))
         if not isinstance(container, (list, str)):
@@ -832,7 +856,9 @@ class Interpreter:
         return m[key]
 
     def eval_Field(self, node, scope):
-        container = self.eval(node.target, scope)
+        return self.field_value(node, self.eval(node.target, scope))
+
+    def field_value(self, node, container):
         if not isinstance(container, dict):
             hint = None
             if isinstance(container, list):

@@ -1,0 +1,22 @@
+;; Benchmark: loops, decisions, recursion, lists, maps and pipelines
+fn fib n
+    when n < 2
+        ret n
+    .
+    ret fib(n - 1) + fib(n - 2)
+.
+let t 0
+loop i 1..300000
+    when i mod 3 = 0
+        up t i
+    .
+.
+let words []
+loop i 1..20000
+    add words "w{i}"
+.
+let m {}
+loop w words
+    let m[w] len(w)
+.
+out t, fib(20), len(m), (1..2000) | each it * 2 | only it mod 4 = 0 | len
