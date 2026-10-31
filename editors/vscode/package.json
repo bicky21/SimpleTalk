@@ -1,8 +1,8 @@
 {
   "name": "simpletalk",
   "displayName": "SimpleTalk",
-  "description": "Syntax highlighting, snippets and auto-indent for the SimpleTalk programming language (.simp files).",
-  "version": "2.3.0",
+  "description": "Run, explain and check SimpleTalk programs (.simp) in VS Code: Run button and F5, plain-English Explain, error squiggles, highlighting, snippets and auto-indent.",
+  "version": "2.3.1",
   "publisher": "bicky21",
   "repository": {
     "type": "git",
@@ -14,15 +14,26 @@
   },
   "categories": [
     "Programming Languages",
-    "Snippets"
+    "Snippets",
+    "Debuggers"
   ],
-  "keywords": ["simpletalk", "simp", "education", "beginner"],
+  "keywords": [
+    "simpletalk",
+    "simp",
+    "education",
+    "beginner"
+  ],
   "contributes": {
     "languages": [
       {
         "id": "simpletalk",
-        "aliases": ["SimpleTalk", "simpletalk"],
-        "extensions": [".simp"],
+        "aliases": [
+          "SimpleTalk",
+          "simpletalk"
+        ],
+        "extensions": [
+          ".simp"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -44,6 +55,150 @@
         "editor.tabSize": 4,
         "editor.insertSpaces": true
       }
+    },
+    "commands": [
+      {
+        "command": "simpletalk.run",
+        "title": "Run SimpleTalk File",
+        "category": "SimpleTalk",
+        "icon": "$(play)"
+      },
+      {
+        "command": "simpletalk.explain",
+        "title": "Explain SimpleTalk File",
+        "category": "SimpleTalk",
+        "icon": "$(book)"
+      },
+      {
+        "command": "simpletalk.trace",
+        "title": "Trace SimpleTalk File (show each line as it runs)",
+        "category": "SimpleTalk",
+        "icon": "$(debug-step-over)"
+      }
+    ],
+    "menus": {
+      "editor/title/run": [
+        {
+          "command": "simpletalk.run",
+          "when": "resourceLangId == simpletalk",
+          "group": "navigation@0"
+        },
+        {
+          "command": "simpletalk.trace",
+          "when": "resourceLangId == simpletalk",
+          "group": "navigation@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "simpletalk.explain",
+          "when": "resourceLangId == simpletalk",
+          "group": "navigation@1"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "simpletalk.run",
+          "when": "editorLangId == simpletalk",
+          "group": "simpletalk@1"
+        },
+        {
+          "command": "simpletalk.explain",
+          "when": "editorLangId == simpletalk",
+          "group": "simpletalk@2"
+        },
+        {
+          "command": "simpletalk.trace",
+          "when": "editorLangId == simpletalk",
+          "group": "simpletalk@3"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "simpletalk.run",
+          "when": "resourceLangId == simpletalk",
+          "group": "simpletalk@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "simpletalk.run",
+          "when": "editorLangId == simpletalk"
+        },
+        {
+          "command": "simpletalk.explain",
+          "when": "editorLangId == simpletalk"
+        },
+        {
+          "command": "simpletalk.trace",
+          "when": "editorLangId == simpletalk"
+        }
+      ]
+    },
+    "debuggers": [
+      {
+        "type": "simpletalk",
+        "label": "SimpleTalk",
+        "languages": [
+          "simpletalk"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "The .simp file to run.",
+                "default": "${file}"
+              },
+              "trace": {
+                "type": "boolean",
+                "description": "Show each line as it runs.",
+                "default": false
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "simpletalk",
+            "request": "launch",
+            "name": "Run SimpleTalk file",
+            "program": "${file}"
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "SimpleTalk: Run file",
+            "body": {
+              "type": "simpletalk",
+              "request": "launch",
+              "name": "Run SimpleTalk file",
+              "program": "^\"\\${file}\""
+            }
+          }
+        ]
+      }
+    ],
+    "configuration": {
+      "title": "SimpleTalk",
+      "properties": {
+        "simpletalk.command": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "The `simpletalk` command to use. Leave empty to find it automatically (a `.venv` or `venv` folder in the project, then your PATH)."
+        },
+        "simpletalk.checkOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Underline mistakes in red when a SimpleTalk file is opened or saved."
+        }
+      }
     }
-  }
+  },
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:simpletalk",
+    "onDebugResolve:simpletalk",
+    "onDebugDynamicConfigurations:simpletalk"
+  ]
 }

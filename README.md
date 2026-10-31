@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/bicky21/SimpleTalk/actions/workflows/tests.yml"><img src="https://github.com/bicky21/SimpleTalk/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/version-2.3.0-1C2A52" alt="Version 2.3.0">
+  <img src="https://img.shields.io/badge/version-2.3.1-1C2A52" alt="Version 2.3.1">
   <img src="https://img.shields.io/badge/python-3.10%2B-2F67B1" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/dependencies-none-66728C" alt="No dependencies">
 </p>
@@ -53,7 +53,7 @@ simpletalk                             # interactive mode
 
 On Windows, activate the environment with `.venv\Scripts\activate`. To skip installing, run `python3 -m simpletalk <file>` from the project folder.
 
-**In VS Code:** install the extension from [`editors/vscode/simpletalk-2.3.0.vsix`](editors/vscode) (Extensions view → `...` → *Install from VSIX...*). You get syntax highlighting, snippets (type `loop` + Tab) and auto-indent for `.simp` files.
+**In VS Code:** install the extension from [`editors/vscode/simpletalk-2.3.1.vsix`](editors/vscode) (Extensions view → `...` → *Install from VSIX...*). Press **F5** or the ▶ button to run a program, use 📖 to explain it, and mistakes are underlined in red when you save. It also adds highlighting, snippets (type `loop` + Tab) and auto-indent.
 
 ## What makes SimpleTalk different
 

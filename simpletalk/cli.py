@@ -50,6 +50,23 @@ def read_source(path):
     return None
 
 
+def check_json(path):
+    """`--check --json`: one line of JSON for editors (used by the VS Code extension)."""
+    import json
+    source = read_source(path)
+    if source is None:
+        print(json.dumps({"ok": False, "line": 1, "column": 1, "message": f"Can't read {path}", "hint": None}))
+        return 2
+    try:
+        Parser(tokenize(source), source).parse_program()
+    except SimpleTalkError as err:
+        print(json.dumps({"ok": False, "line": err.line or 1, "column": err.column or 1,
+                          "message": err.message, "hint": err.hint}))
+        return 1
+    print(json.dumps({"ok": True}))
+    return 0
+
+
 def run_file(path, mode="run"):
     source = read_source(path)
     if source is None:
@@ -177,9 +194,14 @@ def _main(argv=None):
     group.add_argument("--trace", action="store_true",
                        help="run the program and show each line as it runs")
     group.add_argument("--check", action="store_true", help="only check the program for mistakes")
+    ap.add_argument("--json", action="store_true", help="with --check: print the result as JSON (for editors)")
     ap.add_argument("--version", action="version", version=f"SimpleTalk {__version__}")
     args = ap.parse_args(argv)
     mode = "explain" if args.explain else "trace" if args.trace else "check" if args.check else "run"
+    if args.json and mode != "check":
+        ap.error("--json works together with --check")
+    if args.file and args.json:
+        return check_json(args.file)
     if args.file:
         return run_file(args.file, mode)
     if mode != "run":

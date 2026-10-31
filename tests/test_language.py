@@ -689,3 +689,18 @@ def test_playground_bundle_has_engine_and_examples():
     assert "lib/geometry.simp" in bundle["library"]
     for name in ("index.html", "worker.js", "bundle.json"):
         assert (root / "_site" / name).exists()
+
+
+
+def test_check_json_for_editors(tmp_path, capsys):
+    import json
+    bad = tmp_path / "bad.simp"
+    bad.write_text("out 1\nlet x\n")
+    good = tmp_path / "good.simp"
+    good.write_text('out "hi"\n')
+    assert main(["--check", "--json", str(bad)]) == 1
+    result = json.loads(capsys.readouterr().out)
+    assert result == {"ok": False, "line": 2, "column": 6, "message": "'let' needs a value to store.",
+                      "hint": "Write it like: let score 10"}
+    assert main(["--check", "--json", str(good)]) == 0
+    assert json.loads(capsys.readouterr().out) == {"ok": True}

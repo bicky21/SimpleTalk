@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.3.1 – 2026-10-31
+
+### Added
+- VS Code extension 2.3.1: Run with F5 or the ▶ button, Explain and Trace commands,
+  mistakes underlined in red on save, finds the project's `.venv` automatically.
+- `simpletalk --check --json file.simp` prints the result as JSON, for editors.
+
 ## 2.3.0 – 2026-10-31
 
 Faster, and easier to start with.

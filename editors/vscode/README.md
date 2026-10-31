@@ -2,6 +2,11 @@
 
 Support for the [SimpleTalk](https://github.com/bicky21/SimpleTalk) programming language in `.simp` files:
 
+- **Run**: press **F5**, or the ▶ button at the top right of the editor. The program runs in VS Code's terminal, so questions from `in` and Ctrl+C work as usual.
+- **Explain** (📖 button): the program described line by line in plain English.
+- **Trace** (in the ▶ menu or right-click): see each line just before it runs.
+- **Mistakes underlined in red** when you open or save a file, with the fix in the tooltip.
+
 - **Syntax highlighting**: keywords, text with `{values}` inside, numbers, maps, fields, pipelines and the closing `.` of every block.
 - **Snippets**: type a word and press Tab.
 
@@ -24,11 +29,15 @@ Support for the [SimpleTalk](https://github.com/bicky21/SimpleTalk) programming 
 
 ## Install
 
-Download `simpletalk-2.3.0.vsix` from the repository's `editors/vscode` folder, then either:
+Download `simpletalk-2.3.1.vsix` from the repository's `editors/vscode` folder, then either:
 
 - In VS Code: **Extensions** view → `...` menu → **Install from VSIX...**, or
-- In a terminal: `code --install-extension simpletalk-2.3.0.vsix`
+- In a terminal: `code --install-extension simpletalk-2.3.1.vsix`
 
-## Run a program
+Then run **Developer: Reload Window** (Ctrl+Shift+P).
 
-Open a terminal in VS Code and run `simpletalk your_program.simp`.
+## Where it finds SimpleTalk
+
+The extension looks for a `.venv` or `venv` folder in your project (and the folders above the file), then for `simpletalk` on your PATH. To use a different one, set **Settings → SimpleTalk: Command**, for example `/home/me/SimpleTalk/.venv/bin/simpletalk`.
+
+Underlining mistakes needs SimpleTalk 2.3.1 or newer (`simpletalk --version`).
