@@ -127,7 +127,7 @@ def repl():
         try:
             expr = try_expression(source)
             if expr is not None:
-                value = interp.eval(expr, interp.globals)
+                value = interp.evaluate(expr)
                 if value is not None or not isinstance(expr, N.Call):
                     print(show(value, nested=True))
             else:

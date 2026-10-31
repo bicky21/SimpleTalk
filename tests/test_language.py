@@ -392,3 +392,29 @@ def test_cli_test_summary(tmp_path, capsys):
     f.write_text("test 1 = 1\ntest 2 = 2\n")
     assert main([str(f)]) == 0
     assert "[test] 2 tests passed." in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------- stability on small stacks
+def test_deep_recursion_is_friendly_even_on_a_small_stack():
+    """Windows gives Python ~1 MB of stack; Python 3.10 used to crash there."""
+    import threading
+    result = {}
+
+    def job():
+        try:
+            out("fn f\n ret f()\n.\nout f()")
+        except RuntimeProblem as err:
+            result["message"] = err.message
+        result["fact"] = out("fn fact n\n when n <= 1\n  ret 1\n .\n ret n * fact(n - 1)\n.\n"
+                             "out len(txt(fact(900)))")
+
+    old = threading.stack_size()
+    threading.stack_size(1024 * 1024)
+    try:
+        t = threading.Thread(target=job)
+        t.start()
+    finally:
+        threading.stack_size(old)
+    t.join()
+    assert "more than 1000 deep" in result["message"]
+    assert result["fact"] == ["2270"]

@@ -1,10 +1,10 @@
 """Step 3: walk through the tree of nodes and actually run the program."""
 
 import math
-import sys
 
 from . import nodes as N
 from .builtins import BUILTINS
+from .runner import run_protected
 from .errors import RuntimeProblem, SimpleTalkError, did_you_mean
 from .values import Builtin, Function, equal, is_number, show, tidy_number, type_name
 
@@ -72,24 +72,32 @@ class Interpreter:
         self.watched = set()        # names reported by `watch`
         self.tests_passed = 0       # counted by `test`
         self.trace = trace          # function(line_number) called before each step
+        self.interrupted = False    # set by Ctrl+C; the program stops at its next step
 
     # ------------------------------------------------------------- running
     def run(self, program):
-        old_limit = sys.getrecursionlimit()
-        sys.setrecursionlimit(max(old_limit, 50_000))
+        """Run a parsed program (on a big-stack worker thread, see runner.py)."""
+        run_protected(self, lambda: self._guarded(self.exec_block, program, self.globals))
+
+    def evaluate(self, expr):
+        """Work out one expression in the global scope (used by the playground)."""
+        return run_protected(self, lambda: self._guarded(self.eval, expr, self.globals))
+
+    @staticmethod
+    def _guarded(fn, *args):
         try:
-            self.exec_block(program, self.globals)
+            return fn(*args)
         except RecursionError:
             raise RuntimeProblem("The program went too deep (too many nested calls).",
                                  hint="Check that every function that calls itself has a way to stop.")
-        finally:
-            sys.setrecursionlimit(old_limit)
 
     def exec_block(self, body, scope):
         for stmt in body:
             self.execute(stmt, scope)
 
     def execute(self, node, scope):
+        if self.interrupted:
+            raise KeyboardInterrupt
         if self.trace is not None:
             self.trace(node.line)
         try:
@@ -275,6 +283,8 @@ class Interpreter:
 
     def run_loop_body(self, body, scope):
         """Run one pass of a loop. Returns False if the loop should stop."""
+        if self.interrupted:
+            raise KeyboardInterrupt
         try:
             self.exec_block(body, scope)
         except _Skip:
