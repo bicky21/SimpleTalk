@@ -22,6 +22,8 @@
 
 ---
 
+<p align="center"><i>Developed by <b>Bicky Prasad Yadav</b> and <b>Claude</b></i></p>
+
 SimpleTalk is a small programming language for people writing their first programs. Every keyword is **2–5 letters**, every block closes with **a single dot**, and when something goes wrong it shows **where, why, and how to fix it**. It still grows with you: maps, pipelines, pattern matching, error handling, modules, files, JSON and concurrent tasks are all built in. It runs on plain Python with nothing else to install, in about 17 MB of memory.
 
 ```
@@ -318,3 +320,7 @@ editors/vscode/   the VS Code extension
 ```
 
 Contributions are welcome. Run `pip install -e ".[dev]"` and `python -m pytest` before opening a pull request.
+
+## Developers
+
+SimpleTalk is developed by **Bicky Prasad Yadav** ([@bicky21](https://github.com/bicky21)) and **Claude**.
