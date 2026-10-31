@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.1.0 – 2026-10-31
+
+Learning tools built into the language.
+
+### Added
+- `watch name`: report every change to a variable (line number, new and old value), including lists changed in place.
+- `test check`: tests inside your program. A failure shows both sides; a summary is printed when all pass.
+- Smart input: `in age num "Age?"` asks again until a number is typed; `in ok yes "Sure?"` until yes or no (stored as true/false).
+- `simpletalk --explain file.simp`: describes the program line by line in plain English.
+- `simpletalk --trace file.simp`: shows each line just before it runs.
+- `examples/09_superpowers.simp`, banner image, rewritten README.
+
+### Changed
+- `watch` and `test` are now keywords (24 in total), so they can no longer be used as variable names.
+- If input ends while `in ... num` / `in ... yes` is waiting, the program stops with a clear message instead of asking forever.
+
 ## 2.0.0 – 2026-10-31
 
 New, shorter syntax. **Breaking:** 1.0 programs need to be rewritten (see the table in docs/LANGUAGE.md).

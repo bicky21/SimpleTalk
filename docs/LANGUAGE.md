@@ -1,9 +1,9 @@
-# The SimpleTalk Language Guide (version 2.0)
+# The SimpleTalk Language Guide (version 2.1)
 
 SimpleTalk is designed around three rules:
 
 1. **Type less.** Every keyword is 2–5 letters: `let`, `out`, `when`, `loop`, `fn`.
-2. **One way to do each thing.** Only **22 keywords** and **23 built-in functions** — this page lists all of them.
+2. **One way to do each thing.** Only **24 keywords** and **23 built-in functions** — this page lists all of them.
 3. **Never crash with a scary error.** Every mistake gets a line number, a `^` marker and a hint.
 
 ---
@@ -89,7 +89,12 @@ up score 5              ;; add 5
 up score -5             ;; take 5 away
 in name "Your name?"    ;; ask; a typed number becomes a real number
 in answer               ;; ask without a question
+in age num "Age?"       ;; keep asking until a number is typed
+in ok yes "Continue?"   ;; keep asking until yes or no; stores true or false
 ```
+
+`num` and `yes` right after the name always mean "the kind of answer I want".
+`yes` accepts y, yes, ok, sure, haan / n, no, nope, nahi (any capitals).
 
 ## 5. Maths and comparisons
 
@@ -178,7 +183,47 @@ hello()
 - Inputs belong to the function. `let` inside a function changes an outer variable **if it already exists**; otherwise it makes one that only lives inside the function.
 - Functions can call themselves up to 1000 levels deep.
 
-## 10. Built-in functions
+## 10. Watching and testing
+
+These are built into the language, so they work with no setup.
+
+### watch
+```
+let score 0
+watch score             ;; report every change to score from now on
+up score 5
+```
+prints
+```
+[watch] line 2: watching score, now 0
+[watch] line 3: score = 5  (was 0)
+```
+`watch a b` watches several names. A watched list is reported when you `add`, `del` or change an item.
+
+### test
+```
+test square(3) = 9
+test fruits has "kiwi"
+test not done
+```
+A passing test is silent; when the program ends you see `[test] 3 tests passed.`
+A failing test stops the program and shows both sides:
+```
+  Test failed: square(3) = 9
+  Hint: The left side is 6 and the right side is 9.
+```
+
+## 11. The simpletalk command
+
+| Command                         | Does                                                   |
+|---------------------------------|--------------------------------------------------------|
+| `simpletalk file.simp`          | run a program                                          |
+| `simpletalk --explain file.simp`| describe every line in plain English (doesn't run it)  |
+| `simpletalk --trace file.simp`  | run it, showing each line just before it runs          |
+| `simpletalk --check file.simp`  | look for mistakes without running                      |
+| `simpletalk`                    | the playground: type code, see results straight away   |
+
+## 12. Built-in functions
 
 | Function                | Example                                 |
 |-------------------------|-----------------------------------------|
@@ -204,17 +249,18 @@ hello()
 | `copy(list)`            | a separate copy of a list               |
 | `wait(seconds)`         | `wait(0.5)` pauses half a second        |
 
-## 11. All 22 keywords
+## 13. All 24 keywords
 
 ```
 let up out in add del
 when else loop while stop skip fn ret
+watch test
 and or not has mod true false none
 ```
 
 These can't be used as variable names.
 
-## 12. Coming from Python (or SimpleTalk 1.0)?
+## 14. Coming from Python (or SimpleTalk 1.0)?
 
 | Python                    | SimpleTalk 1.0            | SimpleTalk 2.0        |
 |---------------------------|---------------------------|-----------------------|
@@ -240,7 +286,7 @@ These can't be used as variable names.
 
 If you type a word from another language by mistake, SimpleTalk tells you the right one.
 
-## 13. Stability promise
+## 15. Stability promise
 
 From version 2.0, programs that work keep working:
 - Keywords and built-in names won't be renamed or removed in any 2.x release.

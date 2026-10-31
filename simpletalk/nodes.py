@@ -68,6 +68,7 @@ class Say(Node):
 class Ask(Node):
     prompt: Node | None
     target: str
+    kind: str | None = None     # None (any answer), "num" or "yes"
 
 
 @dataclass
@@ -140,6 +141,17 @@ class Stop(Node):
 @dataclass
 class Skip(Node):
     pass
+
+
+@dataclass
+class Watch(Node):
+    names: list
+
+
+@dataclass
+class Test(Node):
+    expr: Node
+    text: str                   # the check as written, shown when it fails
 
 
 @dataclass

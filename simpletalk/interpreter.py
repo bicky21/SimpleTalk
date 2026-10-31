@@ -21,6 +21,9 @@ FRIENDLY_RENAMES = {
 RANGE_LIMIT = 10_000_000
 
 
+_MISSING = object()
+
+
 class _Stop(Exception):
     pass
 
@@ -59,13 +62,16 @@ class Scope:
 
 
 class Interpreter:
-    def __init__(self, output=None, input_fn=None):
+    def __init__(self, output=None, input_fn=None, trace=None):
         self.output = output or (lambda text: print(text, flush=True))
         self.input_fn = input_fn or input
         self.builtins = Scope()
         self.builtins.vars.update(BUILTINS)
         self.globals = Scope(self.builtins)
         self.depth = 0
+        self.watched = set()        # names reported by `watch`
+        self.tests_passed = 0       # counted by `test`
+        self.trace = trace          # function(line_number) called before each step
 
     # ------------------------------------------------------------- running
     def run(self, program):
@@ -84,6 +90,8 @@ class Interpreter:
             self.execute(stmt, scope)
 
     def execute(self, node, scope):
+        if self.trace is not None:
+            self.trace(node.line)
         try:
             getattr(self, "exec_" + type(node).__name__)(node, scope)
         except SimpleTalkError as err:
@@ -98,49 +106,97 @@ class Interpreter:
     def exec_Say(self, node, scope):
         self.output(" ".join(show(self.eval(v, scope)) for v in node.values))
 
+    def read_answer(self, prompt, node):
+        try:
+            return self.input_fn(prompt).strip()
+        except EOFError:
+            if getattr(node, "kind", None):
+                self.fail(node, "The program asked a question, but no answer was typed.")
+            return ""
+
+    @staticmethod
+    def as_number(answer):
+        try:
+            return int(answer)
+        except ValueError:
+            pass
+        try:
+            f = float(answer)
+            if math.isfinite(f) and answer.lower() not in ("nan", "inf", "infinity"):
+                return tidy_number(f)
+        except ValueError:
+            pass
+        return None
+
+    YES = {"y", "yes", "true", "ok", "sure", "haan", "ha"}
+    NO = {"n", "no", "false", "nope", "nahi", "na"}
+
     def exec_Ask(self, node, scope):
         prompt = "" if node.prompt is None else show(self.eval(node.prompt, scope))
         if prompt and not prompt.endswith(" "):
             prompt += " "
-        try:
-            answer = self.input_fn(prompt)
-        except EOFError:
-            answer = ""
-        answer = answer.strip()
-        # Numbers typed by the user become real numbers automatically.
-        value = answer
-        try:
-            value = int(answer)
-        except ValueError:
-            try:
-                f = float(answer)
-                if math.isfinite(f) and answer.lower() not in ("nan", "inf", "infinity"):
-                    value = tidy_number(f)
-            except ValueError:
-                pass
-        self.assign(node.target, value, scope)
+        while True:
+            answer = self.read_answer(prompt, node)
+            if node.kind == "num":
+                value = self.as_number(answer)
+                if value is not None:
+                    break
+                self.output("Please type a number.")
+            elif node.kind == "yes":
+                if answer.lower() in self.YES:
+                    value = True
+                    break
+                if answer.lower() in self.NO:
+                    value = False
+                    break
+                self.output("Please answer yes or no.")
+            else:
+                # Plain `in`: a typed number becomes a real number, anything else stays text.
+                number = self.as_number(answer)
+                value = answer if number is None else number
+                break
+        self.assign(node.target, value, scope, node)
 
-    def assign(self, name, value, scope):
+    def assign(self, name, value, scope, node=None):
         """`let` updates the nearest existing variable, or creates a new one here."""
         target = scope.find(name)
         if target is None or target is self.builtins:
             target = scope
+        old = target.vars.get(name, _MISSING)
         target.vars[name] = value
+        if name in self.watched and node is not None:
+            self.report(name, old, value, node)
+
+    def report(self, name, old, new, node):
+        """Used by `watch`: tell the user a watched variable changed."""
+        if old is _MISSING:
+            self.output(f"[watch] line {node.line}: {name} = {show(new, True)}")
+        else:
+            self.output(f"[watch] line {node.line}: {name} = {show(new, True)}  (was {show(old, True)})")
+
+    def report_list(self, target_node, node, scope):
+        """A watched list was changed in place (add, del, let list[i])."""
+        root = target_node
+        while isinstance(root, N.Index):
+            root = root.target
+        if isinstance(root, N.Name) and root.name in self.watched:
+            self.output(f"[watch] line {node.line}: {root.name} = {show(self.eval(root, scope), True)}")
 
     def exec_Set(self, node, scope):
         value = self.eval(node.value, scope)
         if isinstance(node.target, N.Name):
-            self.assign(node.target.name, value, scope)
+            self.assign(node.target.name, value, scope, node)
             return
         container = self.eval(node.target.target, scope)
         index = self.eval(node.target.index, scope)
         if isinstance(container, str):
             self.fail(node, "Text can't be changed one letter at a time.",
-                      hint="Build a new text instead, e.g. with replace(...).")
+                      hint="Build a new text instead, e.g. with swap(...).")
         if not isinstance(container, list):
             self.fail(node, f"Only lists can be changed with [ ], not {type_name(container)}.")
         pos = self.position(node.target, container, index)
         container[pos] = value
+        self.report_list(node.target, node, scope)
 
     def exec_Change(self, node, scope):
         owner = scope.find(node.name)
@@ -154,6 +210,8 @@ class Interpreter:
         if not is_number(amount):
             self.fail(node, f"'up' needs a number to add to '{node.name}', not {type_name(amount)}.")
         owner.vars[node.name] = tidy_number(current + amount)
+        if node.name in self.watched:
+            self.report(node.name, current, owner.vars[node.name], node)
 
     def exec_Add(self, node, scope):
         value = self.eval(node.value, scope)
@@ -164,6 +222,7 @@ class Interpreter:
                 hint = f"To add to a number, write: up {node.target.name} {show(value)}"
             self.fail(node, f"'add' needs a list, but this is {type_name(target)}.", hint)
         target.append(value)
+        self.report_list(node.target, node, scope)
 
     def exec_Remove(self, node, scope):
         value = self.eval(node.value, scope)
@@ -173,9 +232,38 @@ class Interpreter:
         for i, item in enumerate(target):
             if equal(item, value):
                 del target[i]
+                self.report_list(node.target, node, scope)
                 return
         self.fail(node, f"{show(value, True)} is not in the list, so I can't delete it.",
                   hint="Check first with: when my_list has ...")
+
+    def exec_Watch(self, node, scope):
+        for name in node.names:
+            self.watched.add(name)
+            owner = scope.find(name)
+            if owner is not None and owner is not self.builtins:
+                self.output(f"[watch] line {node.line}: watching {name}, now {show(owner.vars[name], True)}")
+            else:
+                self.output(f"[watch] line {node.line}: watching {name} (not set yet)")
+
+    def exec_Test(self, node, scope):
+        expr = node.expr
+        if isinstance(expr, N.Binary) and expr.op in ("=", "!=", "<", ">", "<=", ">=", "has"):
+            left = self.eval(expr.left, scope)
+            right = self.eval(expr.right, scope)
+            ok = self.eval(N.Binary(expr.op, N.Literal(left), N.Literal(right),
+                                    line=expr.line, column=expr.column), scope)
+            if not ok:
+                self.fail(node, f"Test failed: {node.text}",
+                          hint=f"The left side is {show(left, True)} and the right side is {show(right, True)}.")
+        else:
+            value = self.eval(expr, scope)
+            if not isinstance(value, bool):
+                self.fail(node, f"'test' needs something that is true or false, but got {type_name(value)}.",
+                          hint="Write a check, like: test square(3) = 9")
+            if not value:
+                self.fail(node, f"Test failed: {node.text}", hint="This was false.")
+        self.tests_passed += 1
 
     def exec_If(self, node, scope):
         for cond, body in node.branches:
@@ -229,7 +317,10 @@ class Interpreter:
                 self.fail(node, f"'loop {node.var} ...' needs a list, text or range, but got {type_name(items)}.",
                           hint=f"To count, use a range: loop {node.var} 1..10")
         for item in items:
+            old = scope.vars.get(node.var, _MISSING)
             scope.vars[node.var] = item
+            if node.var in self.watched:
+                self.report(node.var, old, item, node)
             if not self.run_loop_body(node.body, scope):
                 break
 

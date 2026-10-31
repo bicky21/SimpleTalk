@@ -287,7 +287,7 @@ def test_windows_line_endings():
 
 
 # ---------------------------------------------------------------- examples and CLI
-@pytest.mark.parametrize("path", sorted(p for p in EXAMPLES.glob("*.simp") if "guess" not in p.name))
+@pytest.mark.parametrize("path", sorted(p for p in EXAMPLES.glob("*.simp") if "guess" not in p.name and "superpowers" not in p.name))
 def test_examples_run(path, capsys):
     assert main([str(path)]) == 0
     assert "Oops" not in capsys.readouterr().err
@@ -312,3 +312,83 @@ def test_cli_missing_file_and_check(tmp_path, capsys):
     bad.write_text("out nmae\nlet x\n")
     assert main(["--check", str(bad)]) == 1
     assert "line 2" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------- 2.1 features
+def test_watch_reports_changes():
+    lines = out("let s 1\nwatch s\nup s 2\nlet s s * 2\nlet l [1]\nwatch l\nadd l 5\nlet l[1] 9")
+    assert lines == [
+        "[watch] line 2: watching s, now 1",
+        "[watch] line 3: s = 3  (was 1)",
+        "[watch] line 4: s = 6  (was 3)",
+        "[watch] line 6: watching l, now [1]",
+        "[watch] line 7: l = [1, 5]",
+        "[watch] line 8: l = [9, 5]",
+    ]
+
+
+def test_watch_loop_variable_and_unset_name():
+    assert out("watch i\nloop i 1..2\n.") == [
+        "[watch] line 1: watching i (not set yet)",
+        "[watch] line 2: i = 1",
+        "[watch] line 2: i = 2  (was 1)",
+    ]
+
+
+def test_tests_pass_and_fail_with_both_sides():
+    from simpletalk import Interpreter, parse
+    interp = Interpreter(output=lambda s: None)
+    interp.run(parse("test 2 + 2 = 4\ntest [1, 2] has 2\ntest not false"))
+    assert interp.tests_passed == 3
+    err = problem("fn sq n\n ret n * 2\n.\ntest sq(3) = 9  ;; note", RuntimeProblem)
+    assert "Test failed: sq(3) = 9" in str(err)
+    assert "left side is 6" in err.hint and "right side is 9" in err.hint
+    assert "true or false" in str(problem("test 5", RuntimeProblem))
+
+
+def test_smart_input_keeps_asking():
+    assert out('in a num "Age?"\nout a + 1', ["abc", "", "41"]) == \
+        ["Please type a number.", "Please type a number.", "42"]
+    assert out('in ok yes "Sure?"\nout ok', ["maybe", "YES"]) == ["Please answer yes or no.", "true"]
+    assert out("in ok yes\nout ok", ["n"]) == ["false"]
+    # `num` / `yes` right after the name always mean the answer type
+    assert out("in a num\nout a * 2", ["x", "4"]) == ["Please type a number.", "8"]
+
+
+def test_smart_input_without_answer_stops_cleanly():
+    def no_input(prompt):
+        raise EOFError
+    with pytest.raises(RuntimeProblem) as info:
+        run('in a num "Age?"', output=lambda s: None, input_fn=no_input)
+    assert "no answer" in str(info.value)
+
+
+def test_explain_reads_program_in_english():
+    from simpletalk import parse
+    from simpletalk.explain import explain
+    text = explain(parse('let x 5\nwhen x > 3\n out "big"\nelse\n out "small"\n.\nloop i 1..3\n up x -1\n.'))
+    assert "Store 5 in x." in text
+    assert "If x is greater than 3:" in text and "Otherwise:" in text
+    assert "Count i from 1 to 3, and each time:" in text
+    assert "Take 1 away from x." in text
+
+
+def test_explain_every_example(capsys):
+    for path in sorted(EXAMPLES.glob("*.simp")):
+        assert main(["--explain", str(path)]) == 0
+    assert "Oops" not in capsys.readouterr().err
+
+
+def test_trace_shows_each_line(tmp_path, capsys):
+    f = tmp_path / "t.simp"
+    f.write_text('let a 1\nout a\n')
+    assert main(["--trace", str(f)]) == 0
+    printed = capsys.readouterr().out.splitlines()
+    assert printed == ["  > line 1   | let a 1", "  > line 2   | out a", "1"]
+
+
+def test_cli_test_summary(tmp_path, capsys):
+    f = tmp_path / "t.simp"
+    f.write_text("test 1 = 1\ntest 2 = 2\n")
+    assert main([str(f)]) == 0
+    assert "[test] 2 tests passed." in capsys.readouterr().out

@@ -4,12 +4,13 @@ SimpleTalk 2.0 grammar, in one screen:
 
     let NAME VALUE            let NAME[POS] VALUE
     up NAME [AMOUNT]          out [VALUE, VALUE, ...]
-    in NAME [PROMPT]          add LIST VALUE        del LIST VALUE
+    in NAME [num|yes] [PROMPT]                      add LIST VALUE   del LIST VALUE
     when COND ... (else when COND ...)* (else ...)? .
     loop ... .                loop N ... .          loop while COND ... .
     loop NAME LIST_OR_RANGE ... .
     fn NAME PARAM PARAM ... .                       ret [VALUE]
     stop                      skip                  NAME(ARGS)
+    watch NAME NAME ...       test CHECK
 
 A block is closed by a line holding just a dot.
 Rule for calls and positions: no space before ( or [  ->  area(3, 4)  list[1]
@@ -37,8 +38,9 @@ OLD_WORDS = {
 
 
 class Parser:
-    def __init__(self, tokens):
+    def __init__(self, tokens, source=None):
         self.tokens = tokens
+        self.lines = source.replace("\r\n", "\n").replace("\r", "\n").split("\n") if source else None
         self.i = 0
         self.loop_depth = 0
         self.func_depth = 0
@@ -256,11 +258,41 @@ class Parser:
     def stmt_in(self):
         tok = self.next()
         name = self.expect_name("a variable name to store the answer in")
+        kind = None
+        # `in age num "Age?"` keeps asking until a number is typed,
+        # `in ok yes "Sure?"` until yes or no is typed.
+        if self.at("NAME") and self.tok.value in ("num", "yes"):
+            kind = self.next().value
         prompt = None
         if not self.at_line_end():
             prompt = self.expression()
         self.end_of_line()
-        return N.Ask(prompt, name.value, line=tok.line, column=tok.column)
+        return N.Ask(prompt, name.value, kind, line=tok.line, column=tok.column)
+
+    def stmt_watch(self):
+        tok = self.next()
+        if self.at_line_end():
+            self.fail("'watch' needs the name of a variable.", hint="Write it like: watch score")
+        names = []
+        while not self.at_line_end():
+            if self.at("SYMBOL", ","):
+                self.next()
+                continue
+            names.append(self.expect_name("a variable name").value)
+        self.end_of_line()
+        return N.Watch(names, line=tok.line, column=tok.column)
+
+    def stmt_test(self):
+        tok = self.next()
+        if self.at_line_end():
+            self.fail("'test' needs something to check.", hint="Write it like: test square(3) = 9")
+        start = self.tok
+        expr = self.expression()
+        text = "this check"
+        if self.lines and 1 <= start.line <= len(self.lines):
+            text = self.lines[start.line - 1][start.column - 1:].split(";;")[0].strip()
+        self.end_of_line()
+        return N.Test(expr, text, line=tok.line, column=tok.column)
 
     def list_change(self, cls, word):
         tok = self.next()
@@ -552,4 +584,4 @@ class Parser:
 
 
 def parse(source):
-    return Parser(tokenize(source)).parse_program()
+    return Parser(tokenize(source), source).parse_program()

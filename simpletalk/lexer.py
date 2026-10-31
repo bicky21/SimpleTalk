@@ -19,6 +19,7 @@ KEYWORDS = {
     "when", "else",                      # decisions
     "loop", "while", "stop", "skip",     # loops
     "fn", "ret",                         # functions
+    "watch", "test",                     # see changes, check your code
     "and", "or", "not", "has", "mod",    # operators
     "true", "false", "none",             # values
 }
