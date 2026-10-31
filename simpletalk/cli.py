@@ -8,6 +8,7 @@
 """
 
 import argparse
+import errno
 import os
 import sys
 
@@ -152,9 +153,12 @@ def repl():
 def main(argv=None):
     try:
         return _main(argv)
-    except BrokenPipeError:
+    except OSError as err:
         # The output went to a command that stopped reading (like `| head`).
         # That's not a problem with the program, so finish quietly.
+        # (Linux reports a broken pipe; Windows reports "invalid argument".)
+        if not isinstance(err, BrokenPipeError) and err.errno not in (errno.EPIPE, errno.EINVAL):
+            raise
         try:
             devnull = os.open(os.devnull, os.O_WRONLY)
             os.dup2(devnull, sys.stdout.fileno())
