@@ -1,3 +1,0 @@
-repeat 1 times
-    say "Hello, World!"
-end repeat

@@ -1,0 +1,16 @@
+# Decisions with if / else if / else
+set marks to 72
+
+if marks >= 90 then
+    say "Grade A"
+else if marks >= 70 then
+    say "Grade B"
+else if marks >= 50 then
+    say "Grade C"
+else
+    say "Try again next time"
+end if
+
+if marks > 40 and marks is not 100 then
+    say "You passed, and there is still room to grow."
+end if

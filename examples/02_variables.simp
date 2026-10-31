@@ -1,0 +1,11 @@
+# Variables: store a value with "set", update a number with "change"
+set name to "Bicky"
+set age to 20
+say "Hi {name}, you are {age} years old."
+
+change age by 1
+say "Next year you will be {age}."
+
+set price to 49.5
+set count to 3
+say "Total:", price * count

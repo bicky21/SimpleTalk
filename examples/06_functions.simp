@@ -1,0 +1,19 @@
+# Make your own functions with "define"
+define greet(name)
+    say "Welcome, {name}!"
+end define
+
+define square(n)
+    return n * n
+end define
+
+define factorial(n)
+    if n <= 1 then
+        return 1
+    end if
+    return n * factorial(n - 1)
+end define
+
+greet("Bicky")
+say "5 squared is", square(5)
+say "10! is", factorial(10)

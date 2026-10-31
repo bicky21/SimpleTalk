@@ -1,0 +1,21 @@
+# A small game: guess the secret number
+set secret to random(1, 20)
+set tries to 0
+say "I'm thinking of a number between 1 and 20."
+
+repeat forever
+    ask "Your guess?" into guess
+    if not is_number(guess) then
+        say "Please type a number."
+        skip
+    end if
+    change tries by 1
+    if guess < secret then
+        say "Too low!"
+    else if guess > secret then
+        say "Too high!"
+    else
+        say "Correct! You got it in {tries} tries."
+        stop
+    end if
+end repeat
